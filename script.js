@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const walletInfoDiv = document.getElementById('wallet-info');
         const walletAddressSpan = document.getElementById('wallet-address');
         const walletNetworkSpan = document.getElementById('wallet-network');
+        const tonBalanceSpan = document.getElementById('ton-balance');
         const tonkeyBalanceSpan = document.getElementById('tonkey-balance');
         const spendSectionDiv = document.getElementById('spend-section');
         const spendAmountInput = document.getElementById('spend-amount-input');
@@ -116,8 +117,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 walletNetworkSpan.textContent = network === 'mainnet' ? 'Mainnet' : 'Testnet';
                 walletInfoDiv.style.display = 'block';
                 spendSectionDiv.style.display = 'block';
-                tonkeyBalanceSpan.textContent = 'Fetching...';
+                tonBalanceSpan.textContent = 'Fetching...';
+                tonkeyBalanceSpan.textContent = '-- (Temporarily disabled)';
 
+                // Fetch and display native TON balance
+                try {
+                    const nativeBalance = await tonClient.getBalance(Address.parse(address));
+                    tonBalanceSpan.textContent = `${parseFloat(fromNano(nativeBalance)).toFixed(4)} TON`;
+                } catch (e) {
+                    console.error('Error fetching native TON balance:', e);
+                    tonBalanceSpan.textContent = 'Error fetching TON';
+                }
+
+                // Temporarily disable Tonkey balance fetching
+                /*
                 userTonkeyWalletAddress = await getJettonWalletAddress(address, tonkeyMasterAddress);
                 if (userTonkeyWalletAddress) {
                     console.log('User Tonkey Wallet Address:', userTonkeyWalletAddress);
@@ -130,10 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     tonkeyBalanceSpan.textContent = 'Wallet not found for Tonkey';
                 }
+                */
                 if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             } else {
                 walletAddressSpan.textContent = '';
                 walletNetworkSpan.textContent = '';
+                tonBalanceSpan.textContent = '--'; // Reset TON balance display
                 walletInfoDiv.style.display = 'none';
                 spendSectionDiv.style.display = 'none';
                 tonkeyBalanceSpan.textContent = '-- (Connect to fetch)';
