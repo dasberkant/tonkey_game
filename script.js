@@ -398,16 +398,30 @@ function initializeAppLogic() {
 
         if (savedName) currentDonkeyName = savedName;
 
+        // --- ADDED DEBUG FOR introOverlay --- 
+        const introOverlay = document.getElementById('intro-sequence-overlay');
+        if (!introOverlay) {
+            console.error("[IntroDebugCRITICAL] introOverlay element NOT FOUND by getElementById!");
+        } else {
+            console.log("[IntroDebug] introOverlay found. Current classes:", introOverlay.className);
+        }
+        // --- END ADDED DEBUG ---
+
         if (hasDoneIntro === 'true') {
             console.log("[IntroDebug] Intro already completed. Showing connect area.");
-            if(donkeyNamingPage) donkeyNamingPage.classList.add('hidden');
-            else console.error("[IntroDebug] donkeyNamingPage element is null in hasDoneIntro branch!");
+            if(introOverlay) introOverlay.classList.add('hidden');
+            else console.error("[IntroDebug] introOverlay element is null in hasDoneIntro branch!"); // Should not happen if above check passes
             if(connectAreaDiv) connectAreaDiv.classList.remove('hidden');
             else console.error("[IntroDebug] connectAreaDiv element is null in hasDoneIntro branch!");
         } else {
             console.log("[IntroDebug] Intro not completed or first run. Starting intro sequence.");
-            if(donkeyNamingPage) donkeyNamingPage.classList.remove('hidden');
-            else console.error("[IntroDebug] donkeyNamingPage element is null in fresh intro branch!");
+            if(introOverlay) {
+                introOverlay.classList.remove('hidden');
+                console.log("[IntroDebug] Called introOverlay.classList.remove('hidden'). New classes:", introOverlay.className);
+            } else {
+                // This path should ideally not be taken if the earlier check is in place
+                console.error("[IntroDebug] introOverlay element is null in fresh intro branch! CANNOT SHOW INTRO.");
+            }
             if(connectAreaDiv) connectAreaDiv.classList.add('hidden');
             if(gameContainerDiv) gameContainerDiv.classList.add('hidden');
             showStoryPart(0);
