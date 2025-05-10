@@ -1,4 +1,4 @@
-import { TonConnectUI } from 'https://esm.sh/@tonconnect/ui';
+// import { TonConnectUI } from 'https://esm.sh/@tonconnect/ui'; // Remove this line
 
 // Destructuring will be attempted after window.Ton is confirmed
 let TonClient, Address, Cell, beginCell, toNano, fromNano;
@@ -49,8 +49,20 @@ document.addEventListener('DOMContentLoaded', () => {
         let userTonkeyWalletAddress = null;
         let tonClient = null;
 
-        const tonConnectUI = new TonConnectUI({
-            manifestUrl: 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json', // Replace with your hosted manifest
+        // Use the globally available TON_CONNECT_UI
+        if (!window.TON_CONNECT_UI || !window.TON_CONNECT_UI.TonConnectUI) {
+            console.error('CRITICAL: TON Connect UI library not found. Please check index.html.');
+            // Optionally, show an error to the user via Telegram WebApp API if it's available
+            if (tg && tg.showAlert) {
+                 tg.showAlert('Error: TON Connect UI library failed to load.');
+            } else {
+                // Fallback if tg.showAlert is not available or tg is not defined
+                alert('Error: TON Connect UI library failed to load.');
+            }
+            return; // Stop initialization
+        }
+        const tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
+            manifestUrl: 'https://dasberkant.github.io/tonkey_game/tonconnect-manifest.json', // Ensure this is your correct manifest URL
             buttonRootId: 'tonconnect-button-root'
         });
 
@@ -129,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     tonkeyBalanceSpan.textContent = 'Wallet not found for Tonkey';
                 }
-                tg.HapticFeedback.notificationOccurred('success');
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             } else {
                 walletAddressSpan.textContent = '';
                 walletNetworkSpan.textContent = '';
@@ -143,13 +155,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         spendButton.addEventListener('click', async () => {
             if (!tonConnectUI.connected || !userTonkeyWalletAddress || !tonClient) {
-                tg.showAlert('Please connect your wallet, ensure Tonkey wallet is found, and TON client is ready.');
+                const message = !tonConnectUI.connected ? 'Please connect your wallet.' :
+                                !userTonkeyWalletAddress ? 'Tonkey wallet address not found.' :
+                                'TON client not ready.';
+                if (tg && tg.showAlert) tg.showAlert(message);
+                else alert(message);
                 return;
             }
 
             const amountString = spendAmountInput.value;
             if (!amountString || parseFloat(amountString) <= 0) {
-                tg.showAlert('Please enter a valid amount to spend.');
+                if (tg && tg.showAlert) tg.showAlert('Please enter a valid amount to spend.');
+                else alert('Please enter a valid amount to spend.');
                 return;
             }
             
@@ -178,47 +195,72 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
-                tg.showPopup({
-                    title: 'Confirm Transaction',
-                    message: `Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`,
-                    buttons: [
-                        { id: 'confirm', type: 'default', text: 'Confirm' },
-                        { id: 'cancel', type: 'destructive', text: 'Cancel' },
-                    ]
-                }, async (buttonId) => {
-                    if (buttonId === 'confirm') {
-                        try {
-                            const result = await tonConnectUI.sendTransaction(transaction);
-                            console.log('Transaction sent:', result);
-                            tg.showAlert('Transaction sent successfully! Check your wallet.');
-                            tg.HapticFeedback.notificationOccurred('success');
-                            setTimeout(async () => {
-                                if (userTonkeyWalletAddress && tonConnectUI.connected && tonClient) {
-                                    const balance = await getJettonBalance(userTonkeyWalletAddress);
-                                    if (balance !== null) {
-                                        tonkeyBalanceSpan.textContent = `${parseFloat(balance).toFixed(2)} TONKEY`; 
-                                    }
+                // Use a more robust way to confirm, checking for tg.showConfirm first
+                let confirmed = false;
+                if (tg && tg.showConfirm) {
+                    confirmed = await new Promise(resolve => {
+                        tg.showConfirm(
+                            `Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`,
+                            (ok) => resolve(ok)
+                        );
+                    });
+                } else if (tg && tg.showPopup) { // Fallback to showPopup if showConfirm is not available
+                     await new Promise(resolve => {
+                        tg.showPopup({
+                            title: 'Confirm Transaction',
+                            message: `Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`,
+                            buttons: [
+                                { id: 'confirm', type: 'default', text: 'Confirm' },
+                                { id: 'cancel', type: 'destructive', text: 'Cancel' },
+                            ]
+                        }, (buttonId) => {
+                            if (buttonId === 'confirm') confirmed = true;
+                            resolve(true); // Close popup handler
+                        });
+                    });
+                } else { // Further fallback to browser confirm
+                    confirmed = confirm(`Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`);
+                }
+
+                if (confirmed) {
+                    try {
+                        const result = await tonConnectUI.sendTransaction(transaction);
+                        console.log('Transaction sent:', result);
+                        if (tg && tg.showAlert) tg.showAlert('Transaction sent successfully! Check your wallet.');
+                        else alert('Transaction sent successfully! Check your wallet.');
+                        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                        
+                        setTimeout(async () => {
+                            if (userTonkeyWalletAddress && tonConnectUI.connected && tonClient) {
+                                const balance = await getJettonBalance(userTonkeyWalletAddress);
+                                if (balance !== null) {
+                                    tonkeyBalanceSpan.textContent = `${parseFloat(balance).toFixed(2)} TONKEY`; 
                                 }
-                            }, 5000); 
-                        } catch (error) {
-                            console.error('Transaction error:', error);
-                            tg.showAlert('Transaction failed: ' + (error.message || 'Unknown error'));
-                            tg.HapticFeedback.notificationOccurred('error');
-                        }
+                            }
+                        }, 7000); // Increased delay for balance update
+                    } catch (error) {
+                        console.error('Transaction error:', error);
+                        const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown transaction error');
+                        if (tg && tg.showAlert) tg.showAlert('Transaction failed: ' + errorMessage);
+                        else alert('Transaction failed: ' + errorMessage);
+                        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
                     }
-                });
+                }
             } catch (e) {
-                console.error('Error with spend popup or transaction preparation:', e);
-                tg.HapticFeedback.notificationOccurred('error');
+                console.error('Error with confirmation popup or transaction preparation:', e);
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             }
         });
 
-        tg.MainButton.setText('Close App');
-        tg.MainButton.textColor = '#FFFFFF';
-        tg.MainButton.color = '#FF0000';
-        tg.MainButton.show();
-        tg.MainButton.onClick(() => {
-            tg.close();
-        });
+        // Configure Telegram Main Button (optional but good for Mini Apps)
+        if (tg && tg.MainButton) {
+            tg.MainButton.setText('Close App');
+            tg.MainButton.textColor = '#FFFFFF';
+            tg.MainButton.color = '#FF0000'; // Red color for close
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => {
+                tg.close(); // Close the Mini App
+            });
+        }
     } // --------------- APP LOGIC ENDS HERE -----------------
 }); 

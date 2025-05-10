@@ -7,15 +7,20 @@
     <link rel="stylesheet" href="style.css">
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- TON.js Library from JSDelivr (ES Module) -->
+
+    <!-- TON Connect UI (recommended CDN by docs) -->
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+
+    <!-- Core TON Library (for TonClient, Address, Cell etc.) - Loaded as ES Module -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/ton@latest/+esm"></script>
+
     <!-- Placeholder for TON Connect UI script, if needed, or it's handled in script.js -->
 </head>
 <body>
     <div class="container">
         <h1>Tonkey Game</h1>
 
-        <!-- TON Connect button will be rendered here -->
+        <!-- TON Connect button will be rendered here by @tonconnect/ui -->
         <div id="tonconnect-button-root"></div>
 
         <div id="wallet-info" style="display: none;">
@@ -31,7 +36,7 @@
         </div>
     </div>
 
-    <!-- Main application script, type="module" defers execution automatically -->
+    <!-- Main application script -->
     <script type="module" src="script.js"></script>
 </body>
 </html> 
