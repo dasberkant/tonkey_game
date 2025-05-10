@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize TonConnectUI
     // IMPORTANT: Replace with your own hosted manifest URL in a production environment
     const tonConnectUI = new TonConnectUI({
-        manifestUrl: 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json', // or your hosted manifest, e.g., 'https://your-app.com/tonconnect-manifest.json'
+        manifestUrl: 'https://dasberkant.github.io/tonkey_game/tonconnect-manifest.json', // or your hosted manifest, e.g., 'https://your-app.com/tonconnect-manifest.json'
         buttonRootId: 'tonconnect-button-root' // ID of the div where the button will be rendered
     });
 
