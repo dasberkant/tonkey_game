@@ -1,38 +1,27 @@
-// import { TonConnectUI } from 'https://esm.sh/@tonconnect/ui'; // Remove this line
+import { TonConnectUI } from '@tonconnect/ui';
+import { TonClient, Address, Cell, beginCell, toNano, fromNano } from 'ton';
 
-// Destructuring will be attempted after window.Ton is confirmed
-let TonClient, Address, Cell, beginCell, toNano, fromNano;
+// Destructuring for TonClient etc. is now handled by the import
+// let TonClient, Address, Cell, beginCell, toNano, fromNano; // Remove this
 
-function initializeTonLib() {
-    // Now that we expect window.Ton to be available, destructure it.
-    ({ TonClient, Address, Cell, beginCell, toNano, fromNano } = window.Ton);
-}
+// function initializeTonLib() { // This function is no longer needed with direct imports
+//    ({ TonClient, Address, Cell, beginCell, toNano, fromNano } = window.Ton);
+// }
 
 document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    const MAX_POLL_COUNT = 10; // Try for 5 seconds (10 * 500ms)
-    let pollCount = 0;
+    // The polling for window.Ton is no longer needed as we import 'ton' directly
+    // const MAX_POLL_COUNT = 10;
+    // let pollCount = 0;
 
-    function checkTonLibAndInit() {
-        if (window.Ton && window.Ton.TonClient) { // Check for a specific property to be more robust
-            console.log('TON library loaded.');
-            initializeTonLib();
-            initializeAppLogic(); // This function will contain the rest of your original script logic
-        } else {
-            pollCount++;
-            if (pollCount < MAX_POLL_COUNT) {
-                console.log(`TON library not ready, attempt ${pollCount}/${MAX_POLL_COUNT}. Retrying in 500ms...`);
-                setTimeout(checkTonLibAndInit, 500);
-            } else {
-                console.error('CRITICAL: Failed to load TON library after multiple attempts. App functionality will be limited.');
-            }
-        }
-    }
+    // function checkTonLibAndInit() { ... } // Remove this function
+    // checkTonLibAndInit(); // Remove this call
 
-    checkTonLibAndInit(); // Start the check
+    // Directly call initializeAppLogic as dependencies are handled by the bundler
+    initializeAppLogic();
 
     // --------------- APP LOGIC STARTS HERE (moved into a function) ----------------- 
     function initializeAppLogic() {
@@ -49,28 +38,20 @@ document.addEventListener('DOMContentLoaded', () => {
         let userTonkeyWalletAddress = null;
         let tonClient = null;
 
-        // Use the globally available TON_CONNECT_UI
-        if (!window.TON_CONNECT_UI || !window.TON_CONNECT_UI.TonConnectUI) {
-            console.error('CRITICAL: TON Connect UI library not found. Please check index.html.');
-            // Optionally, show an error to the user via Telegram WebApp API if it's available
-            if (tg && tg.showAlert) {
-                 tg.showAlert('Error: TON Connect UI library failed to load.');
-            } else {
-                // Fallback if tg.showAlert is not available or tg is not defined
-                alert('Error: TON Connect UI library failed to load.');
+        // const tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({ // Remove this instantiation
+        const tonConnectUI = new TonConnectUI({ // Use the imported TonConnectUI
+            manifestUrl: 'https://dasberkant.github.io/tonkey_game/tonconnect-manifest.json',
+            buttonRootId: 'tonconnect-button-root',
+            uiOptions: {
+                twaReturnUrl: 'https://dasberkant.github.io/tonkey_game/' // TODO: Replace with your actual TMA URL
             }
-            return; // Stop initialization
-        }
-        const tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: 'https://dasberkant.github.io/tonkey_game/tonconnect-manifest.json', // Ensure this is your correct manifest URL
-            buttonRootId: 'tonconnect-button-root'
         });
 
         function getTonClient(network) {
-            if (!TonClient) {
-                console.error('CRITICAL: TonClient is not initialized! Cannot create TON API client.');
-                return null;
-            }
+            // if (!TonClient) { // TonClient is available from import
+            //     console.error('CRITICAL: TonClient is not initialized! Cannot create TON API client.');
+            //     return null;
+            // }
             if (network === 'mainnet') {
                 return new TonClient({
                     endpoint: 'https://toncenter.com/api/v2/jsonRPC',

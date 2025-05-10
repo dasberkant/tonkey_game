@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tonkey Game</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Telegram Web App SDK -->
+    <!-- Telegram Web App SDK (still needed from CDN) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- TON Connect UI (recommended CDN by docs) -->
-    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-
-    <!-- Core TON Library (for TonClient, Address, Cell etc.) - Loaded as ES Module -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/ton@latest/+esm"></script>
+    <!-- @tonconnect/ui and ton libraries will be bundled by Parcel into script.js -->
+    <!-- Remove: <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script> -->
+    <!-- Remove: <script type="module" src="https://cdn.jsdelivr.net/npm/ton@latest/+esm"></script> -->
 
     <!-- Placeholder for TON Connect UI script, if needed, or it's handled in script.js -->
 </head>
@@ -36,7 +34,7 @@
         </div>
     </div>
 
-    <!-- Main application script -->
+    <!-- Main application script - Parcel will process this -->
     <script type="module" src="script.js"></script>
 </body>
 </html> 

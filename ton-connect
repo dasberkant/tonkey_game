@@ -1,0 +1,237 @@
+TON Connect SDKs
+SDK List
+info
+We recommend using the @tonconnect/ui-react kit for your DApps. Only switch to lower levels of the SDK or reimplement your protocol version if your product requires it.
+
+This page contains the list of useful libraries for TON Connect.
+
+TON Connect React
+TON Connect JS SDK
+TON Connect Vue
+TON Connect Python SDK
+TON Connect Dart
+TON Connect C#
+TON Connect Unity
+TON Connect Go
+TON Connect React
+@tonconnect/ui-react - TON Connect User Interface (UI) for React applications
+@tonconnect/ui-react is a React UI kit for the TON Connect SDK. Use it to connect your app to TON wallets via the TON Connect protocol in React apps.
+
+Example of a DApp with @tonconnect/ui-react: GitHub
+Example of deployed demo-dapp-with-react-ui: GitHub
+npm i @tonconnect/ui-react
+
+GitHub
+NPM
+API Documentation
+TON Connect JS SDK
+The TON Connect repository contains the following main packages:
+
+@tonconnect/ui - TON Connect User Interface (UI)
+@tonconnect/sdk - TON Connect SDK
+@tonconnect/protocol - TON Connect protocol specifications
+TON Connect UI
+TON Connect UI is a UI kit for TON Connect SDK. Use it to connect your app to TON wallets via the TON Connect protocol. It allows you to integrate TON Connect into your app more efficiently using our UI elements, such as the connect wallet button, select wallet dialog, and confirmation modals.
+
+npm i @tonconnect/ui
+
+GitHub
+NPM
+API Documentation
+The TON Connect User Interface (UI) is a framework that allows developers to improve and unify the user experience (UX) for TON application users.
+
+Developers can easily integrate TON Connect with apps using simple UI elements such as the connect wallet button, select wallet dialog, and confirmation modals. Here are three primary examples of how TON Connect improves UX in apps:
+
+Example of app functionality in the DApp browser: GitHub
+Example of a backend partition of the DApp above: GitHub
+Bridge server using Go: GitHub
+This kit simplifies the implementation of TON Connect in apps built for the TON Blockchain. Standard frontend frameworks are supported, as are applications that don’t use predetermined frameworks.
+
+TON Connect SDK
+The TON Connect SDK is the lowest level of the three frameworks that help developers integrate TON Connect into their applications. It primarily connects apps to TON wallet apps via the TON Connect protocol.
+
+GitHub
+NPM
+TON Connect protocol models
+This package contains protocol requests, protocol responses, event models, and encoding and decoding functions. Developers may use this to integrate TON Connect to wallet apps written in TypeScript. In order to integrate TON Connect into a DApp, use the @tonconnect/sdk.
+
+GitHub
+NPM
+TON Connect Vue
+TON Connect UI Vue is a Vue UI kit for the TON Connect SDK. Use it to connect your app to TON wallets via the TON Connect protocol in Vue apps.
+
+Example of a DApp with @townsquarelabs/ui-vue: GitHub
+Example of deployed demo-dapp-with-vue-ui: GitHub
+npm i @townsquarelabs/ui-vue
+
+GitHub
+NPM
+TON Connect Python
+pytonconnect
+Python SDK for TON Connect 2.0. An analog of the @tonconnect/sdk library.
+
+Use it to connect your app to TON wallets via the TON Connect protocol.
+
+pip3 install pytonconnect
+
+GitHub
+ClickoTON-Foundation tonconnect
+Library for connecting TON Connect to Python apps
+
+git clone https://github.com/ClickoTON-Foundation/tonconnect.git
+pip install -e tonconnect
+
+GitHub
+
+TON Connect Dart
+Dart SDK for TON Connect 2.0. analog of the @tonconnect/sdk library.
+
+Use it to connect your app to TON wallets via the TON Connect protocol.
+
+ $ dart pub add darttonconnect
+
+GitHub
+TON Connect C#
+C# SDK for TON Connect 2.0. An analog of the @tonconnect/sdk library.
+
+Use it to connect your app to TON wallets via the TON Connect protocol.
+
+ $ dotnet add package TonSdk.Connect
+
+GitHub
+TON Connect Unity
+Unity asset for TON Connect 2.0. Uses continuation-team/TonSdk.NET/tree/main/TonSDK.Connect.
+
+Use it to integrate the TON Connect protocol with your game.
+
+GitHub
+Docs
+TON Connect Go
+Go SDK for TON Connect 2.0.
+
+Use it to connect your app to TON wallets via the TON Connect protocol.
+
+ go get github.com/cameo-engineering/tonconnect
+
+GitHub
+General questions and concerns
+If you encounter any additional issues during the implementation of TON Connect, contact developers with GitHub issues.
+
+
+
+************
+
+TON Connect for JS
+This guide will help you integrate TON Connect into your Javascript app for user authentication and transactions.
+
+If using React for your DApp, look at the TON Connect UI React SDK.
+
+If you're using Vue for your DApp, look at the TON Connect UI Vue SDK.
+
+Implementation
+Installation
+CDN
+NPM
+Add the script to the <HEAD> element of your website:
+
+
+
+<script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+
+
+TON Connect initiation
+After installing the package, create a manifest.json file for your app. More information on how to create a manifest.json file can be found here.
+
+Add a button with a ton-connect id to connect to the wallet:
+
+<div id="ton-connect"></div>
+
+After this tag, add a script for tonConnectUI in the <body> part of the app page:
+
+<script>
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+        manifestUrl: 'https://<YOUR_APP_URL>/tonconnect-manifest.json',
+        buttonRootId: 'ton-connect'
+    });
+</script>
+
+Connect to the wallet
+The 'ton-connect' button in buttonRootId will automatically manage clicks.
+
+But you can open connect modal programmatically, for example, after clicking on the custom button:
+
+<script>
+    async function connectToWallet() {
+        const connectedWallet = await tonConnectUI.connectWallet();
+        // Do something with connectedWallet if needed
+        console.log(connectedWallet);
+    }
+
+    // Call the function
+    connectToWallet().catch(error => {
+        console.error("Error connecting to wallet:", error);
+    });
+</script>
+
+Redirects
+Customizing return strategy
+To redirect the user to a specific URL after connection, you can customize your return strategy.
+
+Telegram Mini Apps
+To redirect the user to a Telegram Mini App after wallet connection use the twaReturnUrl option:
+
+tonConnectUI.uiOptions = {
+      twaReturnUrl: 'https://t.me/YOUR_APP_NAME'
+  };
+
+Read more in SDK documentation
+
+UI customization
+TonConnect UI provides an interface that should be familiar and recognizable to the user when using various apps. However, the app developer can modify this interface to keep it consistent with the app's interface.
+
+TonConnect UI documentation
+SDK documentation
+SDK documentation
+Latest API documentation
+Usage
+Let's look at the example of using the TON Connect UI in the app.
+
+Sending messages
+Here's an example of sending a transaction using the TON Connect UI:
+
+import TonConnectUI from '@tonconnect/ui';
+
+const tonConnectUI = new TonConnectUI({ //connect application
+    manifestUrl: 'https://<YOUR_APP_URL>/tonconnect-manifest.json',
+    buttonRootId: '<YOUR_CONNECT_BUTTON_ANCHOR_ID>'
+});
+
+const transaction = {
+  validUntil: Math.floor(Date.now() / 1000) + 60, // 60 sec
+  messages: [
+        {
+            address: "EQABa48hjKzg09hN_HjxOic7r8T1PleIy1dRd8NvZ3922MP0", // destination address
+            amount: "20000000" //Toncoin in nanotons
+        }
+    ]
+}
+
+const result = await tonConnectUI.sendTransaction(transaction)
+
+
+tip
+Get more examples on the Preparing messages page.
+
+Understanding transaction status by hash
+Learn the principle explained in payment processing using the tonweb library.
+
+Signing and verification
+Understand how to sign and verify messages using the TON Connect:
+
+Signing and verification
+TON Connect UI implementation on GitHub
+Wallet disconnection
+Call to disconnect the wallet:
+
+await tonConnectUI.disconnect();
+
