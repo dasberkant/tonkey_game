@@ -39,6 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let userTonkeyWalletAddress = null;
         let tonClient = null;
 
+        const CHAIN = {
+            MAINNET: '-239',
+            TESTNET: '-3'
+        };
+
         // const tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({ // Remove this instantiation
         const tonConnectUI = new TonConnectUI({ // Use the imported TonConnectUI
             manifestUrl: 'https://dasberkant.github.io/tonkey_game/tonconnect-manifest.json',
@@ -48,16 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        function getTonClient(network) {
-            // if (!TonClient) { // TonClient is available from import
-            //     console.error('CRITICAL: TonClient is not initialized! Cannot create TON API client.');
-            //     return null;
-            // }
-            if (network === 'mainnet') {
+        function getTonClient(networkChainId) {
+            if (networkChainId === CHAIN.MAINNET) {
                 return new TonClient({
                     endpoint: 'https://toncenter.com/api/v2/jsonRPC',
                 });
             }
+            // Default to Testnet if not Mainnet (or add more specific checks if other networks are possible)
             return new TonClient({
                 endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC',
             });
@@ -109,12 +111,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (wallet) {
                 console.log('TonConnectUI onStatusChange - Wallet object:', JSON.stringify(wallet, null, 2)); // DETAILED LOGGING
                 const address = wallet.account.address;
-                const network = wallet.account.chain; 
-                tonClient = getTonClient(network);
+                const networkChainId = wallet.account.chain; // Get the actual chain ID
+                tonClient = getTonClient(networkChainId); // Pass the chain ID
                 if (!tonClient) return; // Stop if client couldn't be initialized
 
                 walletAddressSpan.textContent = `${Address.parse(address).toString({ bounceable: false }).slice(0, 6)}...${Address.parse(address).toString({ bounceable: false }).slice(-4)}`;
-                walletNetworkSpan.textContent = network === 'mainnet' ? 'Mainnet' : 'Testnet';
+                walletNetworkSpan.textContent = networkChainId === CHAIN.MAINNET ? 'Mainnet' : 'Testnet'; // Display based on chain ID
                 walletInfoDiv.style.display = 'block';
                 spendSectionDiv.style.display = 'block';
                 tonBalanceSpan.textContent = 'Fetching...';
