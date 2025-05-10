@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const spendAmountInput = document.getElementById('spend-amount-input');
         const spendButton = document.getElementById('spend-button');
 
-        const tonkeyMasterAddress = 'EQCn9sEMALm9Np1tkKZmKuK9h9z1mSbyDWQOPOup9mhe5pFB';
+        const tonkeyMasterAddress = 'image.pngEQCn9sEMALm9Np1tkKZmKuK9h9z1mSbyDWQOPOup9mhe5pFB';
         const TONKEY_DECIMALS = 9; // IMPORTANT: Replace with your Tonkey's actual decimals
         let userTonkeyWalletAddress = null;
         let tonClient = null;
@@ -67,15 +67,31 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const masterAddress = Address.parse(jettonMasterAddr);
                 const ownerAddr = Address.parse(ownerAddress);
-                
+
+                // Prepare the argument for get_wallet_address
+                const ownerAddrCell = beginCell().storeAddress(ownerAddr).endCell();
+
+                console.log(`Attempting get_wallet_address for owner ${ownerAddress} on master ${jettonMasterAddr}`);
+
                 const result = await tonClient.runMethod(
                     masterAddress,
                     'get_wallet_address',
-                    [{ type: 'slice', cell: beginCell().storeAddress(ownerAddr).endCell() }]
+                    // Standard way to pass a single slice argument according to ton.js docs for more complex scenarios
+                    // but let's try providing the stack arguments directly as per some simpler examples if the contract is lenient
+                    // [{ type: 'slice', cell: ownerAddrCell }] 
+                    // Simpler stack representation if the contract method expects it directly:
+                    [{ type: 'cell_slice', cell: ownerAddrCell }] // Changed 'slice' to 'cell_slice' as another common way
+                                                                // or even just [ownerAddrCell] if the library handles it.
+                                                                // For now, trying 'cell_slice' as it's more specific than just 'slice' for a whole cell.
                 );
+                console.log('get_wallet_address result:', result);
                 return result.stack.readAddress().toString();
             } catch (error) {
                 console.error('Error getting Jetton wallet address:', error);
+                // Log more details from the error if available
+                if (error.response && error.response.data) {
+                    console.error('RPC Error details:', error.response.data);
+                }
                 return null;
             }
         }
