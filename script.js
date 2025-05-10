@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const spendAmountInput = document.getElementById('spend-amount-input');
         const spendButton = document.getElementById('spend-button');
 
-        const tonkeyMasterAddress = 'image.pngEQCn9sEMALm9Np1tkKZmKuK9h9z1mSbyDWQOPOup9mhe5pFB';
+        const tonkeyMasterAddress = 'EQCn9sEMALm9Np1tkKZmKuK9h9z1mSbyDWQOPOup9mhe5pFB';
         const TONKEY_DECIMALS = 9; // IMPORTANT: Replace with your Tonkey's actual decimals
         let userTonkeyWalletAddress = null;
         let tonClient = null;
