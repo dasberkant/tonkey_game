@@ -180,6 +180,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // --- BEGIN ADDED DEBUG LOGGING ---
+            console.log('Spend Action: Debugging tonConnectUI.wallet object:');
+            try {
+                console.log(JSON.stringify(tonConnectUI.wallet, null, 2));
+            } catch (e) {
+                console.log('Could not stringify tonConnectUI.wallet:', e);
+                console.log('tonConnectUI.wallet direct:', tonConnectUI.wallet);
+            }
+
+            if (tonConnectUI.wallet && tonConnectUI.wallet.account) {
+                console.log('Spend Action: tonConnectUI.wallet.account.address is:', tonConnectUI.wallet.account.address);
+                console.log('Spend Action: typeof tonConnectUI.wallet.account.address is:', typeof tonConnectUI.wallet.account.address);
+            } else {
+                console.error('Spend Action: tonConnectUI.wallet or tonConnectUI.wallet.account is not available!');
+                if (tg && tg.showAlert) tg.showAlert('Wallet account information is missing. Please reconnect.');
+                else alert('Wallet account information is missing. Please reconnect.');
+                return;
+            }
+            // --- END ADDED DEBUG LOGGING ---
+
             const amountString = spendAmountInput.value;
             if (!amountString || parseFloat(amountString) <= 0) {
                 if (tg && tg.showAlert) tg.showAlert('Please enter a valid amount to spend.');
@@ -191,27 +211,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const recipientAddress = 'UQC4PB_Zs2z-1CetayPu1qE5yokaoZCoYc2TIrb3ZZDMwUIj'; // Placeholder
             const forwardTonAmount = toNano('0.005'); 
 
-            const body = beginCell()
-                .storeUint(0x0f8a7ea5, 32)
-                .storeUint(0, 64)
-                .storeCoins(jettonAmount)
-                .storeAddress(Address.parse(recipientAddress))
-                .storeAddress(Address.parse(tonConnectUI.wallet.account.address))
-                .storeMaybeRef(null)
-                .storeCoins(forwardTonAmount)
-                .storeMaybeRef(null)
-                .endCell();
+            try { // Added try-catch around address parsing and cell creation
+                const body = beginCell()
+                    .storeUint(0x0f8a7ea5, 32)
+                    .storeUint(0, 64)
+                    .storeCoins(jettonAmount)
+                    .storeAddress(Address.parse(recipientAddress)) // User might have changed this
+                    .storeAddress(Address.parse(tonConnectUI.wallet.account.address)) // Error occurs here
+                    .storeMaybeRef(null)
+                    .storeCoins(forwardTonAmount)
+                    .storeMaybeRef(null)
+                    .endCell();
 
-            const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 360,
-                messages: [{
-                    address: userTonkeyWalletAddress,
-                    amount: toNano('0.005').toString(),
-                    payload: body.toBoc().toString('base64')
-                }]
-            };
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 360,
+                    messages: [{
+                        address: userTonkeyWalletAddress,
+                        amount: toNano('0.005').toString(),
+                        payload: body.toBoc().toString('base64')
+                    }]
+                };
 
-            try {
                 // Use a more robust way to confirm, checking for tg.showConfirm first
                 let confirmed = false;
                 if (tg && tg.showConfirm) {
@@ -257,6 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         }, 7000); // Increased delay for balance update
                     } catch (error) {
                         console.error('Transaction error:', error);
+                        // Log the full error object for more details
+                        console.error('Full transaction error object:', error);
                         const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown transaction error');
                         if (tg && tg.showAlert) tg.showAlert('Transaction failed: ' + errorMessage);
                         else alert('Transaction failed: ' + errorMessage);
@@ -264,7 +286,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } catch (e) {
-                console.error('Error with confirmation popup or transaction preparation:', e);
+                console.error('Error with confirmation popup, address parsing, or transaction preparation:', e);
+                // Log the full error object
+                console.error('Full preparation error object:', e);
+                if (tg && tg.showAlert) tg.showAlert('Error preparing transaction: ' + (e.message || 'Unknown error'));
+                else alert('Error preparing transaction: ' + (e.message || 'Unknown error'));
                 if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             }
         });
