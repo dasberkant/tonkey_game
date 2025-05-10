@@ -326,15 +326,26 @@ function initializeAppLogic() {
     // --- Intro Sequence Logic ---
     let currentStoryPart = 0;
     function showStoryPart(index) {
+        console.log(`[IntroDebug] showStoryPart called with index: ${index}`);
         const storyParts = [
             document.getElementById('story-part-1'),
             document.getElementById('story-part-2'),
             document.getElementById('story-part-3')
         ];
-        storyParts.forEach((part, i) => part.classList.toggle('hidden', i !== index));
+        storyParts.forEach((part, i) => {
+            if (!part) {
+                console.error(`[IntroDebug] Story part element at index ${i} is null!`)
+                return;
+            }
+            const shouldHide = i !== index;
+            part.classList.toggle('hidden', shouldHide);
+            console.log(`[IntroDebug] Story part ${i} hidden: ${shouldHide}`);
+        });
         if (index >= storyParts.length) { // End of story, show naming
             const donkeyNamingPage = document.getElementById('donkey-naming-page');
-            donkeyNamingPage.classList.remove('hidden');
+            if(donkeyNamingPage) donkeyNamingPage.classList.remove('hidden');
+            else console.error("[IntroDebug] donkeyNamingPage element is null!");
+            console.log("[IntroDebug] Showing donkey naming page.");
         }
     }
 
@@ -360,32 +371,45 @@ function initializeAppLogic() {
         tempDonkeyNameDisplay.textContent = donkeyNameInput.value.trim() || "Tonkey";
     });
 
-    confirmDonkeyNameButton.addEventListener('click', () => {
-        const name = donkeyNameInput.value.trim();
-        if (name && name.length > 0 && name.length <= 20) {
-            currentDonkeyName = name;
-            localStorage.setItem(LOCAL_STORAGE_DONKEY_NAME_KEY, currentDonkeyName);
-            localStorage.setItem(LOCAL_STORAGE_INTRO_KEY, 'true');
-            donkeyNamingPage.classList.add('hidden');
-            connectAreaDiv.classList.remove('hidden'); 
-            updateAllDisplays(); // Update name on main game screen
-        } else {
-            showAlertFallback('Please give your Tonkey a name (1-20 characters)!');
-        }
-    });
+    if (confirmDonkeyNameButton) {
+        confirmDonkeyNameButton.addEventListener('click', () => {
+            const name = donkeyNameInput ? donkeyNameInput.value.trim() : '';
+            if (name && name.length > 0 && name.length <= 20) {
+                currentDonkeyName = name;
+                localStorage.setItem(LOCAL_STORAGE_DONKEY_NAME_KEY, currentDonkeyName);
+                localStorage.setItem(LOCAL_STORAGE_INTRO_KEY, 'true');
+                console.log("[IntroDebug] Intro completed. Flag set. Donkey name:", currentDonkeyName);
+                if(donkeyNamingPage) donkeyNamingPage.classList.add('hidden');
+                if(connectAreaDiv) connectAreaDiv.classList.remove('hidden'); 
+                updateAllDisplays();
+            } else {
+                showAlertFallback('Please give your Tonkey a name (1-20 characters)!');
+            }
+        });
+    } else {
+        console.error("[IntroDebug] confirmDonkeyNameButton not found!");
+    }
 
     function checkIntroStatus() {
+        console.log("[IntroDebug] checkIntroStatus called.");
         const hasDoneIntro = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY);
         const savedName = localStorage.getItem(LOCAL_STORAGE_DONKEY_NAME_KEY);
+        console.log(`[IntroDebug] localStorage - hasDoneIntro: ${hasDoneIntro}, savedName: ${savedName}`);
+
         if (savedName) currentDonkeyName = savedName;
 
         if (hasDoneIntro === 'true') {
-            donkeyNamingPage.classList.add('hidden');
-            connectAreaDiv.classList.remove('hidden');
+            console.log("[IntroDebug] Intro already completed. Showing connect area.");
+            if(donkeyNamingPage) donkeyNamingPage.classList.add('hidden');
+            else console.error("[IntroDebug] donkeyNamingPage element is null in hasDoneIntro branch!");
+            if(connectAreaDiv) connectAreaDiv.classList.remove('hidden');
+            else console.error("[IntroDebug] connectAreaDiv element is null in hasDoneIntro branch!");
         } else {
-            donkeyNamingPage.classList.remove('hidden');
-            connectAreaDiv.classList.add('hidden');
-            gameContainerDiv.classList.add('hidden');
+            console.log("[IntroDebug] Intro not completed or first run. Starting intro sequence.");
+            if(donkeyNamingPage) donkeyNamingPage.classList.remove('hidden');
+            else console.error("[IntroDebug] donkeyNamingPage element is null in fresh intro branch!");
+            if(connectAreaDiv) connectAreaDiv.classList.add('hidden');
+            if(gameContainerDiv) gameContainerDiv.classList.add('hidden');
             showStoryPart(0);
         }
     }
