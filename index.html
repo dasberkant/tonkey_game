@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tonkey Game</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- TON Connect SDK (we'll likely use a more specific one like @tonconnect/ui-react or @tonconnect/sdk later) -->
+    <!-- For now, this is a placeholder -->
+</head>
+<body>
+    <div class="container">
+        <h1>Tonkey Game</h1>
+
+        <!-- TON Connect button will be rendered here -->
+        <div id="tonconnect-button-root"></div>
+
+        <div id="wallet-info" style="display: none;">
+            <p>Wallet Connected: <span id="wallet-address"></span></p>
+            <p>Network: <span id="wallet-network"></span></p>
+            <p>Tonkey Balance: <span id="tonkey-balance">-- (Connect to fetch)</span></p>
+        </div>
+
+        <div id="spend-section" style="display: none;">
+            <h2>Spend Tonkey Tokens</h2>
+            <input type="number" id="spend-amount-input" placeholder="Amount to spend">
+            <button id="spend-button">Spend</button>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html> 
