@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- TON.js Library -->
+    <!-- TON.js Library - THIS MUST LOAD BEFORE script.js tries to use window.Ton -->
     <script src="https://unpkg.com/ton@latest/dist/ton-browser-esm.js"></script>
     <!-- Placeholder for TON Connect UI script, if needed, or it's handled in script.js -->
 </head>
@@ -31,6 +31,7 @@
         </div>
     </div>
 
+    <!-- Main application script, type="module" defers execution automatically -->
     <script type="module" src="script.js"></script>
 </body>
 </html> 
