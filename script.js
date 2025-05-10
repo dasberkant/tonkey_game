@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 walletInfoDiv.style.display = 'block';
                 spendSectionDiv.style.display = 'block';
                 tonBalanceSpan.textContent = 'Fetching...';
-                tonkeyBalanceSpan.textContent = '-- (Temporarily disabled)';
+                tonkeyBalanceSpan.textContent = 'Fetching...';
 
                 // Fetch and display native TON balance
                 try {
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Temporarily disable Tonkey balance fetching
-                /*
+                // Re-enable Tonkey balance fetching
                 userTonkeyWalletAddress = await getJettonWalletAddress(address, tonkeyMasterAddress);
                 if (userTonkeyWalletAddress) {
                     console.log('User Tonkey Wallet Address:', userTonkeyWalletAddress);
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     tonkeyBalanceSpan.textContent = 'Wallet not found for Tonkey';
                 }
-                */
+                
                 if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             } else {
                 walletAddressSpan.textContent = '';
