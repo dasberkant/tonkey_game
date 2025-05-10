@@ -28,19 +28,27 @@ function initializeAppLogic() {
 
     // UI Elements - Connection
     const connectAreaDiv = document.getElementById('connect-area');
+    console.log('[DOM CHECK] connectAreaDiv:', connectAreaDiv ? 'Found' : 'NOT FOUND');
     const loadingSpinnerDiv = document.getElementById('loading-spinner');
+    console.log('[DOM CHECK] loadingSpinnerDiv:', loadingSpinnerDiv ? 'Found' : 'NOT FOUND');
 
     // UI Elements - Intro
     const introOverlay = document.getElementById('intro-sequence-overlay');
+    console.log('[DOM CHECK] introOverlay:', introOverlay ? 'Found' : 'NOT FOUND');
     const storyPartElements = [
         document.getElementById('story-part-1'),
         document.getElementById('story-part-2'),
         document.getElementById('story-part-3'),
     ];
+    console.log('[DOM CHECK] story-part-1:', storyPartElements[0] ? 'Found' : 'NOT FOUND');
+    console.log('[DOM CHECK] story-part-2:', storyPartElements[1] ? 'Found' : 'NOT FOUND');
+    console.log('[DOM CHECK] story-part-3:', storyPartElements[2] ? 'Found' : 'NOT FOUND');
     const donkeyNamingPage = document.getElementById('donkey-naming-page');
+    console.log('[DOM CHECK] donkeyNamingPage:', donkeyNamingPage ? 'Found' : 'NOT FOUND');
 
     // UI Elements - Game Core
     const gameContainerDiv = document.getElementById('game-container');
+    console.log('[DOM CHECK] gameContainerDiv:', gameContainerDiv ? 'Found' : 'NOT FOUND');
     const donkeyDisplayDiv = document.getElementById('donkey-display'); // For animations
     
     // UI Elements - Stats & Inventory
