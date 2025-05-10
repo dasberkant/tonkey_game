@@ -68,23 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const masterAddress = Address.parse(jettonMasterAddr);
                 const ownerAddr = Address.parse(ownerAddress);
 
-                // Prepare the argument for get_wallet_address
-                const ownerAddrCell = beginCell().storeAddress(ownerAddr).endCell();
-
-                console.log(`Attempting get_wallet_address for owner ${ownerAddress} on master ${jettonMasterAddr}`);
+                // console.log(`Attempting get_wallet_address for owner ${ownerAddress} on master ${jettonMasterAddr}`);
 
                 const result = await tonClient.runMethod(
                     masterAddress,
                     'get_wallet_address',
-                    // Standard way to pass a single slice argument according to ton.js docs for more complex scenarios
-                    // but let's try providing the stack arguments directly as per some simpler examples if the contract is lenient
-                    // [{ type: 'slice', cell: ownerAddrCell }] 
-                    // Simpler stack representation if the contract method expects it directly:
-                    [{ type: 'cell_slice', cell: ownerAddrCell }] // Changed 'slice' to 'cell_slice' as another common way
-                                                                // or even just [ownerAddrCell] if the library handles it.
-                                                                // For now, trying 'cell_slice' as it's more specific than just 'slice' for a whole cell.
+                    [{ type: 'slice', cell: beginCell().storeAddress(ownerAddr).endCell() }] // Reverted to standard slice argument
                 );
-                console.log('get_wallet_address result:', result);
+                // console.log('get_wallet_address result:', result);
                 return result.stack.readAddress().toString();
             } catch (error) {
                 console.error('Error getting Jetton wallet address:', error);
