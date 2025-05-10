@@ -99,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tonConnectUI.onStatusChange(async wallet => {
             if (wallet) {
+                console.log('TonConnectUI onStatusChange - Wallet object:', JSON.stringify(wallet, null, 2)); // DETAILED LOGGING
                 const address = wallet.account.address;
                 const network = wallet.account.chain; 
                 tonClient = getTonClient(network);
