@@ -188,8 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             const jettonAmount = toNano(amountString);
-            const recipientAddress = 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA_Tal'; // Placeholder
-            const forwardTonAmount = toNano('0.05'); 
+            const recipientAddress = 'UQC4PB_Zs2z-1CetayPu1qE5yokaoZCoYc2TIrb3ZZDMwUIj'; // Placeholder
+            const forwardTonAmount = toNano('0.005'); 
 
             const body = beginCell()
                 .storeUint(0x0f8a7ea5, 32)
@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 validUntil: Math.floor(Date.now() / 1000) + 360,
                 messages: [{
                     address: userTonkeyWalletAddress,
-                    amount: toNano('0.1').toString(),
+                    amount: toNano('0.005').toString(),
                     payload: body.toBoc().toString('base64')
                 }]
             };
