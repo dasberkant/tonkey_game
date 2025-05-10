@@ -56,14 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
         function getTonClient(networkChainId) {
             if (networkChainId === CHAIN.MAINNET) {
                 return new TonClient({
-                    // endpoint: 'https://toncenter.com/api/v2/jsonRPC',
-                    endpoint: 'https://tonhubapi.com/jsonRPC', // Switched to Tonhub API
+                    // endpoint: 'https://tonhubapi.com/jsonRPC', // Switched to Tonhub API
+                    endpoint: 'https://ton.orbs.network/json-rpc', // Switched to Orbs Network RPC
                 });
             }
             // Default to Testnet if not Mainnet (or add more specific checks if other networks are possible)
             return new TonClient({
-                // endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC',
-                endpoint: 'https://testnet.tonhubapi.com/jsonRPC', // Assuming Tonhub has a similar testnet endpoint structure
+                // endpoint: 'https://testnet.tonhubapi.com/jsonRPC', // Assuming Tonhub has a similar testnet endpoint structure
+                endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC', // Reverted to toncenter for Testnet
             });
         }
 
