@@ -30,19 +30,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --------------- APP LOGIC STARTS HERE (moved into a function) ----------------- 
     function initializeAppLogic() {
-        const walletInfoDiv = document.getElementById('wallet-info');
-        const walletAddressSpan = document.getElementById('wallet-address');
-        const walletNetworkSpan = document.getElementById('wallet-network');
-        const tonBalanceSpan = document.getElementById('ton-balance');
-        const tonkeyBalanceSpan = document.getElementById('tonkey-balance');
-        const spendSectionDiv = document.getElementById('spend-section');
-        const spendAmountInput = document.getElementById('spend-amount-input');
-        const spendButton = document.getElementById('spend-button');
+        // UI Elements - Connection & Old
+        const connectAreaDiv = document.getElementById('connect-area');
+        const loadingSpinnerDiv = document.getElementById('loading-spinner');
+        // const walletInfoDiv = document.getElementById('wallet-info'); // Kept for now, but display:none
+        // const spendSectionDiv = document.getElementById('spend-section'); // Kept for now, but display:none
+
+        // UI Elements - Game
+        const gameContainerDiv = document.getElementById('game-container');
+        const donkeyAreaDiv = document.getElementById('donkey-area'); // For future donkey image/customization
+        const tonkeyBalanceGameSpan = document.getElementById('tonkey-balance-game');
+        const lhbBalanceSpan = document.getElementById('lhb-balance');
+        const exploreButton = document.getElementById('explore-button');
+        const exploreMessageP = document.getElementById('explore-message');
+        const buyPremiumMapButton = document.getElementById('buy-premium-map-button');
+        const premiumMapCostSpan = document.getElementById('premium-map-cost');
+        const buyGourmetOatsButton = document.getElementById('buy-gourmet-oats-button');
+        const gourmetOatsCostSpan = document.getElementById('gourmet-oats-cost');
 
         const tonkeyMasterAddress = 'EQCn9sEMALm9Np1tkKZmKuK9h9z1mSbyDWQOPOup9mhe5pFB';
-        const TONKEY_DECIMALS = 9; // IMPORTANT: Replace with your Tonkey's actual decimals
+        const TONKEY_DECIMALS = 9;
+        const SHOP_RECIPIENT_ADDRESS = 'UQC4PB_Zs2z-1CetayPu1qE5yokaoZCoYc2TIrb3ZZDMwUIj'; // Placeholder for game treasury/burn
+
         let userTonkeyWalletAddress = null;
         let tonClient = null;
+        let luckyHayBales = 100; // Starting LHB
+        let userWalletAddress = null; // store raw user address
 
         const CHAIN = {
             MAINNET: '-239',
@@ -58,6 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        function updateLHBDisplay() {
+            lhbBalanceSpan.textContent = luckyHayBales;
+        }
+        updateLHBDisplay(); // Initial display
+
         function getTonClient(networkChainId) {
             if (networkChainId === CHAIN.MAINNET) {
                 return new TonClient({
@@ -72,102 +90,171 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        async function getJettonWalletAddress(ownerAddress, jettonMasterAddr) {
+        async function getJettonWalletAddress(ownerAddressStr, jettonMasterAddrStr) {
             if (!tonClient) return null;
             try {
-                const masterAddress = Address.parse(jettonMasterAddr);
-                const ownerAddr = Address.parse(ownerAddress);
-
-                // console.log(`Attempting get_wallet_address for owner ${ownerAddress} on master ${jettonMasterAddr}`);
-
-                const result = await tonClient.runMethod(
-                    masterAddress,
-                    'get_wallet_address',
-                    [{ type: 'slice', cell: beginCell().storeAddress(ownerAddr).endCell() }] // Reverted to standard slice argument
-                );
-                // console.log('get_wallet_address result:', result);
+                const masterAddress = Address.parse(jettonMasterAddrStr);
+                const ownerAddr = Address.parse(ownerAddressStr);
+                const result = await tonClient.runMethod(masterAddress, 'get_wallet_address', [{ type: 'slice', cell: beginCell().storeAddress(ownerAddr).endCell() }]);
                 return result.stack.readAddress().toString();
             } catch (error) {
                 console.error('Error getting Jetton wallet address:', error);
-                // Log more details from the error if available
-                if (error.response && error.response.data) {
-                    console.error('RPC Error details:', error.response.data);
-                }
                 return null;
             }
         }
 
-        async function getJettonBalance(jettonWalletAddr) {
-            if (!tonClient || !jettonWalletAddr) return null;
+        async function getJettonBalance(jettonWalletAddrStr) {
+            if (!tonClient || !jettonWalletAddrStr) return 'Error';
             try {
-                const walletAddress = Address.parse(jettonWalletAddr);
+                const walletAddress = Address.parse(jettonWalletAddrStr);
                 const result = await tonClient.runMethod(walletAddress, 'get_wallet_data');
-                const balance = result.stack.readBigNumber();
-                return fromNano(balance); 
+                const balance = result.stack.readBigNumber(); // balance is a BigNumber
+                // Format with TONKEY_DECIMALS
+                return parseFloat(fromNano(balance)).toFixed(2); // Using fromNano for jettons with decimals
             } catch (error) {
                 console.error('Error getting Jetton balance:', error);
                 if (error.message && (error.message.includes('exit_code: -13') || error.message.includes('method not found'))){
-                    return '0'; 
+                     return '0.00'; // Wallet exists but might be uninitialized for jettons or empty
                 }
-                console.error('Error fetching balance: ' + (error.message || error.toString()));
-                return null;
+                return 'Error';
+            }
+        }
+        
+        async function fetchAndDisplayTonkeyBalance() {
+            if (!userWalletAddress || !tonClient) {
+                tonkeyBalanceGameSpan.textContent = 'N/A';
+                return;
+            }
+            tonkeyBalanceGameSpan.textContent = 'Fetching...';
+            userTonkeyWalletAddress = await getJettonWalletAddress(userWalletAddress, tonkeyMasterAddress);
+            if (userTonkeyWalletAddress) {
+                const balance = await getJettonBalance(userTonkeyWalletAddress);
+                tonkeyBalanceGameSpan.textContent = balance;
+            } else {
+                tonkeyBalanceGameSpan.textContent = '0.00 (No Jetton Wallet)';
             }
         }
 
         tonConnectUI.onStatusChange(async wallet => {
+            loadingSpinnerDiv.classList.remove('hidden');
             if (wallet) {
-                console.log('TonConnectUI onStatusChange - Wallet object:', JSON.stringify(wallet, null, 2)); // DETAILED LOGGING
-                const address = wallet.account.address;
-                const networkChainId = wallet.account.chain; // Get the actual chain ID
-                tonClient = getTonClient(networkChainId); // Pass the chain ID
-                if (!tonClient) return; // Stop if client couldn't be initialized
+                userWalletAddress = wallet.account.address; // Store raw address
+                const networkChainId = wallet.account.chain;
+                tonClient = getTonClient(networkChainId);
 
-                walletAddressSpan.textContent = `${Address.parse(address).toString({ bounceable: false }).slice(0, 6)}...${Address.parse(address).toString({ bounceable: false }).slice(-4)}`;
-                walletNetworkSpan.textContent = networkChainId === CHAIN.MAINNET ? 'Mainnet' : 'Testnet'; // Display based on chain ID
-                walletInfoDiv.style.display = 'block';
-                spendSectionDiv.style.display = 'block';
-                tonBalanceSpan.textContent = 'Fetching...';
-                tonkeyBalanceSpan.textContent = 'Fetching...';
-
-                // Fetch and display native TON balance
-                try {
-                    const nativeBalance = await tonClient.getBalance(Address.parse(address));
-                    tonBalanceSpan.textContent = `${parseFloat(fromNano(nativeBalance)).toFixed(4)} TON`;
-                } catch (e) {
-                    console.error('Error fetching native TON balance:', e);
-                    tonBalanceSpan.textContent = 'Error fetching TON';
-                }
-
-                await sleep(1100); // Wait a bit more than 1 second to be safe
-
-                // Re-enable Tonkey balance fetching
-                userTonkeyWalletAddress = await getJettonWalletAddress(address, tonkeyMasterAddress);
-                if (userTonkeyWalletAddress) {
-                    console.log('User Tonkey Wallet Address:', userTonkeyWalletAddress);
-                    
-                    await sleep(1100); // Wait a bit more than 1 second before fetching Jetton balance
-
-                    const balance = await getJettonBalance(userTonkeyWalletAddress);
-                    if (balance !== null) {
-                        tonkeyBalanceSpan.textContent = `${parseFloat(balance).toFixed(2)} TONKEY`; 
-                    } else {
-                        tonkeyBalanceSpan.textContent = 'Error fetching';
-                    }
-                } else {
-                    tonkeyBalanceSpan.textContent = 'Wallet not found for Tonkey';
-                }
+                connectAreaDiv.classList.add('hidden');
+                gameContainerDiv.style.display = 'block';
                 
+                await fetchAndDisplayTonkeyBalance();
+                updateLHBDisplay(); // Ensure LHB is current
+
                 if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                loadingSpinnerDiv.classList.add('hidden');
+
             } else {
-                walletAddressSpan.textContent = '';
-                walletNetworkSpan.textContent = '';
-                tonBalanceSpan.textContent = '--'; // Reset TON balance display
-                walletInfoDiv.style.display = 'none';
-                spendSectionDiv.style.display = 'none';
-                tonkeyBalanceSpan.textContent = '-- (Connect to fetch)';
-                userTonkeyWalletAddress = null;
+                userWalletAddress = null;
                 tonClient = null;
+                userTonkeyWalletAddress = null;
+                
+                connectAreaDiv.classList.remove('hidden');
+                gameContainerDiv.style.display = 'none';
+                tonkeyBalanceGameSpan.textContent = '--';
+                // LHB balance can remain as it's client-side for now
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                loadingSpinnerDiv.classList.add('hidden');
             }
+        });
+
+        exploreButton.addEventListener('click', () => {
+            const cost = 5;
+            if (luckyHayBales >= cost) {
+                luckyHayBales -= cost;
+                const foundLHB = Math.floor(Math.random() * 10) + 5; // Found 5-14 LHB
+                luckyHayBales += foundLHB;
+                updateLHBDisplay();
+                exploreMessageP.textContent = `Your Tonkey explored and found ${foundLHB} LHB!`;
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                setTimeout(() => exploreMessageP.textContent = '', 3000);
+            } else {
+                exploreMessageP.textContent = "Not enough LHB to explore!";
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                setTimeout(() => exploreMessageP.textContent = '', 3000);
+            }
+        });
+
+        async function handleShopPurchase(itemName, tokenAmountString, successCallback) {
+            if (!tonConnectUI.connected || !userTonkeyWalletAddress || !tonClient) {
+                showAlertFallback('Please connect your wallet properly to make a purchase.');
+                return;
+            }
+            
+            const confirmed = await showConfirmFallback(
+                `Confirm purchase of ${itemName} for ${tokenAmountString} Tonkey Tokens? This is a REAL transaction.`
+            );
+
+            if (!confirmed) {
+                showAlertFallback('Purchase cancelled.');
+                return;
+            }
+
+            try {
+                const jettonAmount = toNano(tokenAmountString); 
+                const forwardTonAmount = toNano('0.005'); // Standard forward amount
+
+                // Generic payload for item purchase, can be expanded later
+                const body = beginCell()
+                    .storeUint(0x0f8a7ea5, 32) // op code for jetton transfer
+                    .storeUint(0, 64) // query_id
+                    .storeCoins(jettonAmount)
+                    .storeAddress(Address.parse(SHOP_RECIPIENT_ADDRESS))
+                    .storeAddress(Address.parse(userWalletAddress)) // response_destination_address (sender)
+                    .storeMaybeRef(null) // custom_payload (none for now)
+                    .storeCoins(forwardTonAmount) // forward_ton_amount
+                    .storeMaybeRef(null) // forward_payload (none for now)
+                    .endCell();
+
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 360, // 6 minutes
+                    messages: [{
+                        address: userTonkeyWalletAddress, // User's jetton wallet address
+                        amount: toNano('0.05').toString(), // Amount to send for the transaction itself (covering fees)
+                        payload: body.toBoc().toString('base64')
+                    }]
+                };
+            
+                const result = await tonConnectUI.sendTransaction(transaction);
+                console.log('Transaction sent for ' + itemName + ':', result);
+                showAlertFallback(`${itemName} purchase successful! Transaction sent.`);
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+                // Call success callback (e.g., to update LHB)
+                if (successCallback) successCallback();
+
+                // Refresh Tonkey balance after a delay
+                setTimeout(fetchAndDisplayTonkeyBalance, 7000);
+
+            } catch (error) {
+                console.error(`Transaction error for ${itemName}:`, error);
+                showAlertFallback(`Transaction for ${itemName} failed: ` + (error.message || 'Unknown error'));
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+            }
+        }
+
+        buyPremiumMapButton.addEventListener('click', async () => {
+            const cost = premiumMapCostSpan.textContent; // e.g. "10"
+            handleShopPurchase('Premium Expedition Map', cost, () => {
+                // Future: Add a "Premium Map" item to player inventory
+                console.log('Premium Map effect would be applied here.');
+            });
+        });
+        
+        buyGourmetOatsButton.addEventListener('click', async () => {
+            const cost = gourmetOatsCostSpan.textContent; // e.g. "5"
+            handleShopPurchase('Gourmet Oats Package', cost, () => {
+                luckyHayBales += 100;
+                updateLHBDisplay();
+                showAlertFallback('Added 100 LHB from Gourmet Oats!');
+            });
         });
 
         // Helper function for alerts with fallback
@@ -200,112 +287,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        spendButton.addEventListener('click', async () => {
-            if (!tonConnectUI.connected || !userTonkeyWalletAddress || !tonClient) {
-                const message = !tonConnectUI.connected ? 'Please connect your wallet.' :
-                                !userTonkeyWalletAddress ? 'Tonkey wallet address not found.' :
-                                'TON client not ready.';
-                showAlertFallback(message); // Use fallback
-                return;
-            }
-
-            // --- BEGIN ADDED DEBUG LOGGING ---
-            console.log('Spend Action: Debugging tonConnectUI.wallet object:');
-            try {
-                console.log(JSON.stringify(tonConnectUI.wallet, null, 2));
-            } catch (e) {
-                console.log('Could not stringify tonConnectUI.wallet:', e);
-                console.log('tonConnectUI.wallet direct:', tonConnectUI.wallet);
-            }
-
-            if (tonConnectUI.wallet && tonConnectUI.wallet.account) {
-                console.log('Spend Action: tonConnectUI.wallet.account.address is:', tonConnectUI.wallet.account.address);
-                console.log('Spend Action: typeof tonConnectUI.wallet.account.address is:', typeof tonConnectUI.wallet.account.address);
-            } else {
-                console.error('Spend Action: tonConnectUI.wallet or tonConnectUI.wallet.account is not available!');
-                if (tg && tg.showAlert) tg.showAlert('Wallet account information is missing. Please reconnect.');
-                else alert('Wallet account information is missing. Please reconnect.');
-                return;
-            }
-            // --- END ADDED DEBUG LOGGING ---
-
-            const amountString = spendAmountInput.value;
-            if (!amountString || parseFloat(amountString) <= 0) {
-                showAlertFallback('Please enter a valid amount to spend.'); // Use fallback
-                return;
-            }
-            
-            const jettonAmount = toNano(amountString);
-            const recipientAddress = 'UQC4PB_Zs2z-1CetayPu1qE5yokaoZCoYc2TIrb3ZZDMwUIj'; // Placeholder
-            const forwardTonAmount = toNano('0.005'); 
-
-            try { // Added try-catch around address parsing and cell creation
-                const body = beginCell()
-                    .storeUint(0x0f8a7ea5, 32)
-                    .storeUint(0, 64)
-                    .storeCoins(jettonAmount)
-                    .storeAddress(Address.parse(recipientAddress)) // User might have changed this
-                    .storeAddress(Address.parse(tonConnectUI.wallet.account.address)) // Error occurs here
-                    .storeMaybeRef(null)
-                    .storeCoins(forwardTonAmount)
-                    .storeMaybeRef(null)
-                    .endCell();
-
-                const transaction = {
-                    validUntil: Math.floor(Date.now() / 1000) + 360,
-                    messages: [{
-                        address: userTonkeyWalletAddress,
-                        amount: toNano('0.005').toString(),
-                        payload: body.toBoc().toString('base64')
-                    }]
-                };
-
-                // Use a more robust way to confirm, checking for tg.showConfirm first
-                let confirmed = false;
-                // --- MODIFIED CONFIRMATION LOGIC ---
-                confirmed = await showConfirmFallback(
-                    `Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`
-                );
-                // --- END MODIFIED CONFIRMATION LOGIC ---
-
-                if (confirmed) {
-                    try {
-                        const result = await tonConnectUI.sendTransaction(transaction);
-                        console.log('Transaction sent:', result);
-                        showAlertFallback('Transaction sent successfully! Check your wallet.'); // Use fallback
-                        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                        
-                        setTimeout(async () => {
-                            if (userTonkeyWalletAddress && tonConnectUI.connected && tonClient) {
-                                const balance = await getJettonBalance(userTonkeyWalletAddress);
-                                if (balance !== null) {
-                                    tonkeyBalanceSpan.textContent = `${parseFloat(balance).toFixed(2)} TONKEY`; 
-                                }
-                            }
-                        }, 7000); // Increased delay for balance update
-                    } catch (error) {
-                        console.error('Transaction error:', error);
-                        // Log the full error object for more details
-                        console.error('Full transaction error object:', error);
-                        const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown transaction error');
-                        showAlertFallback('Transaction failed: ' + errorMessage); // Use fallback
-                        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-                    }
-                }
-            } catch (e) {
-                console.error('Error with address parsing, or transaction preparation:', e); // Removed "confirmation popup"
-                // Log the full error object
-                console.error('Full preparation error object:', e);
-                showAlertFallback('Error preparing transaction: ' + (e.message || 'Unknown error')); // Use fallback
-                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-            }
-        });
-
         // Configure Telegram Main Button (optional but good for Mini Apps)
         if (tg && tg.MainButton) {
-            tg.MainButton.setText('Close App');
+            tg.MainButton.setText('Close Game');
             tg.MainButton.textColor = '#FFFFFF';
-            tg.MainButton.color = '#FF0000'; // Red color for close
+            tg.MainButton.color = '#D2691E'; // Donkey brown color
             tg.MainButton.show();
             tg.MainButton.onClick(() => {
                 tg.close(); // Close the Mini App
