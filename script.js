@@ -30,6 +30,15 @@ function initializeAppLogic() {
     const connectAreaDiv = document.getElementById('connect-area');
     const loadingSpinnerDiv = document.getElementById('loading-spinner');
 
+    // UI Elements - Intro
+    const introOverlay = document.getElementById('intro-sequence-overlay');
+    const storyPartElements = [
+        document.getElementById('story-part-1'),
+        document.getElementById('story-part-2'),
+        document.getElementById('story-part-3'),
+    ];
+    const donkeyNamingPage = document.getElementById('donkey-naming-page');
+
     // UI Elements - Game Core
     const gameContainerDiv = document.getElementById('game-container');
     const donkeyDisplayDiv = document.getElementById('donkey-display'); // For animations
@@ -97,6 +106,43 @@ function initializeAppLogic() {
         buttonRootId: 'tonconnect-button-root',
         uiOptions: { twaReturnUrl: 'https://dasberkant.github.io/tonkey_game/' }
     });
+
+    // --- Central UI Visibility Management ---
+    function updateUIVisibility() {
+        const introDone = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY) === 'true';
+        const isConnected = tonConnectUI.connected; // Or check userWalletAddress if more direct
+
+        console.log(`[UIUpdate] Updating visibility. IntroDone: ${introDone}, IsConnected: ${isConnected}, CurrentStoryPart: ${currentStoryPart}`);
+
+        // Ensure all are potentially hidden first, then show the correct one.
+        if (introOverlay) introOverlay.classList.add('hidden');
+        else console.error("[UIUpdate] introOverlay is null!");
+
+        if (connectAreaDiv) connectAreaDiv.classList.add('hidden');
+        else console.error("[UIUpdate] connectAreaDiv is null!");
+
+        if (gameContainerDiv) gameContainerDiv.classList.add('hidden');
+        else console.error("[UIUpdate] gameContainerDiv is null!");
+        
+        // Naming page is part of intro sequence, managed by showStoryPart, but ensure it's hidden if introOverlay is hidden.
+        if (donkeyNamingPage && introDone) donkeyNamingPage.classList.add('hidden');
+
+
+        if (!introDone) {
+            console.log("[UIUpdate] Showing intro sequence.");
+            if (introOverlay) {
+                introOverlay.classList.remove('hidden');
+                // showStoryPart will manage children of introOverlay (story parts, naming page)
+                showStoryPart(currentStoryPart); // Ensure currentStoryPart is correctly set
+            }
+        } else if (!isConnected) {
+            console.log("[UIUpdate] Intro done, not connected. Showing connect area.");
+            if (connectAreaDiv) connectAreaDiv.classList.remove('hidden');
+        } else { // Intro done AND connected
+            console.log("[UIUpdate] Intro done, connected. Showing game container.");
+            if (gameContainerDiv) gameContainerDiv.classList.remove('hidden');
+        }
+    }
 
     // --- UI Update Functions ---
     function updateAllDisplays() {
@@ -286,33 +332,45 @@ function initializeAppLogic() {
         const cost = gourmetOatsCostSpan.textContent;
         handleShopPurchase('Gourmet Oats Package', cost, () => {
             luckyHayBales += 100;
-            // updateLHBDisplay() is called in updateAllDisplays() which is called in handleShopPurchase
+            // updateAllDisplays() is called in handleShopPurchase
         });
     });
     // --- End Game Logic ---
 
     // --- Initialization & Wallet Connection Handling ---
     tonConnectUI.onStatusChange(async wallet => {
-        loadingSpinnerDiv.classList.remove('hidden');
+        console.log("[Debug] onStatusChange triggered. Wallet:", wallet ? wallet.account.address : 'null');
+        if(loadingSpinnerDiv) loadingSpinnerDiv.classList.remove('hidden');
+        else console.error("[onStatusChange] loadingSpinnerDiv is null!");
+
+
         if (wallet) {
+            console.log("[Debug] Wallet connected processing.");
             userWalletAddress = wallet.account.address;
             tonClient = getTonClient(wallet.account.chain);
-            connectAreaDiv.classList.add('hidden');
-            gameContainerDiv.classList.remove('hidden');
-            await fetchAndDisplayTonkeyBalance();
-            updateAllDisplays(); 
-            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        } else {
+            await fetchAndDisplayTonkeyBalance(); // Fetch balance when connected
+                                                // game state (like LHB) should NOT reset on connect, only on disconnect.
+        } else { // Disconnected or initial state (before intro completion handled by updateUIVisibility)
+            console.log("[Debug] Wallet disconnected or not yet connected processing.");
             userWalletAddress = null; tonClient = null; userTonkeyWalletAddress = null;
-            connectAreaDiv.classList.remove('hidden');
-            gameContainerDiv.classList.add('hidden');
-            tonkeyBalanceGameSpan.textContent = '--';
-             // Reset game state on disconnect for simplicity, or persist via localStorage later
+            // Reset game state on disconnect
             luckyHayBales = 50; mysteryGeodesCount = 0; shinyPebblesCount = 0; ancientCoinsCount = 0; hasPremiumMap = false; blueprintFragmentsCount = 0;
-            updateAllDisplays(); 
+            currentDonkeyName = "Barnaby"; // Reset name on disconnect if not persisted elsewhere or re-fetched
+            // Consider if donkey name should also be cleared from localStorage on disconnect, or if it persists. For now, it persists.
+        }
+
+        updateUIVisibility(); // Central place to update visibility
+        updateAllDisplays(); // Update numerical displays after state changes & potential game state reset
+
+        // Haptic feedback based on the new state
+        const introDone = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY) === 'true';
+        if (wallet && introDone) { // Connected and intro done
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        } else if (!wallet && introDone) { // Disconnected and intro done
             if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
-        loadingSpinnerDiv.classList.add('hidden');
+
+        if(loadingSpinnerDiv) loadingSpinnerDiv.classList.add('hidden');
     });
 
     if (tg && tg.MainButton) {
@@ -326,26 +384,21 @@ function initializeAppLogic() {
     // --- Intro Sequence Logic ---
     let currentStoryPart = 0;
     function showStoryPart(index) {
-        console.log(`[IntroDebug] showStoryPart called with index: ${index}`);
-        const storyParts = [
-            document.getElementById('story-part-1'),
-            document.getElementById('story-part-2'),
-            document.getElementById('story-part-3')
-        ];
-        storyParts.forEach((part, i) => {
-            if (!part) {
-                console.error(`[IntroDebug] Story part element at index ${i} is null!`)
-                return;
-            }
+        console.log(`[IntroDebug] showStoryPart called with index: ${index}. Target element IDs: story-part-1, story-part-2, story-part-3`);
+        storyPartElements.forEach((part, i) => {
+            if (!part) { console.error(`[IntroDebug] Story part element at index ${i} is null! Make sure storyPartElements array is correct.`); return; }
             const shouldHide = i !== index;
             part.classList.toggle('hidden', shouldHide);
-            console.log(`[IntroDebug] Story part ${i} hidden: ${shouldHide}`);
+            // console.log(`[IntroDebug] Story part ${i} (${part.id}) hidden: ${shouldHide}`);
         });
-        if (index >= storyParts.length) { // End of story, show naming
-            const donkeyNamingPage = document.getElementById('donkey-naming-page');
-            if(donkeyNamingPage) donkeyNamingPage.classList.remove('hidden');
-            else console.error("[IntroDebug] donkeyNamingPage element is null!");
+
+        if (!donkeyNamingPage) console.error("[IntroDebug] donkeyNamingPage element is null in showStoryPart!");
+
+        if (index >= storyPartElements.filter(p => p !== null).length) { // Check against actual available story parts
+            if (donkeyNamingPage) donkeyNamingPage.classList.remove('hidden');
             console.log("[IntroDebug] Showing donkey naming page.");
+        } else {
+             if (donkeyNamingPage) donkeyNamingPage.classList.add('hidden'); // Ensure naming page is hidden during story
         }
     }
 
@@ -356,19 +409,19 @@ function initializeAppLogic() {
     ];
 
     nextStoryButtons.forEach((button, index) => {
-        button.addEventListener('click', () => {
+        if(button) button.addEventListener('click', () => {
             currentStoryPart = index + 1;
             showStoryPart(currentStoryPart);
         });
+        else console.error(`[IntroDebug] nextStoryButton at index ${index} is null`);
     });
 
-    const donkeyNamingPage = document.getElementById('donkey-naming-page');
     const donkeyNameInput = document.getElementById('donkey-name-input');
     const confirmDonkeyNameButton = document.getElementById('confirm-donkey-name');
     const tempDonkeyNameDisplay = document.getElementById('temp-donkey-name-display');
 
     donkeyNameInput.addEventListener('input', () => {
-        tempDonkeyNameDisplay.textContent = donkeyNameInput.value.trim() || "Tonkey";
+        if(tempDonkeyNameDisplay) tempDonkeyNameDisplay.textContent = donkeyNameInput.value.trim() || "Tonkey";
     });
 
     if (confirmDonkeyNameButton) {
@@ -379,53 +432,48 @@ function initializeAppLogic() {
                 localStorage.setItem(LOCAL_STORAGE_DONKEY_NAME_KEY, currentDonkeyName);
                 localStorage.setItem(LOCAL_STORAGE_INTRO_KEY, 'true');
                 console.log("[IntroDebug] Intro completed. Flag set. Donkey name:", currentDonkeyName);
-                if(donkeyNamingPage) donkeyNamingPage.classList.add('hidden');
-                if(connectAreaDiv) connectAreaDiv.classList.remove('hidden'); 
-                updateAllDisplays();
+                
+                // No direct DOM manipulation for introOverlay, connectAreaDiv here.
+                // updateUIVisibility will handle showing the connectAreaDiv.
+                updateUIVisibility();
+                updateAllDisplays(); // Update displays like donkey name if it's shown somewhere else.
             } else {
                 showAlertFallback('Please give your Tonkey a name (1-20 characters)!');
             }
         });
     } else {
-        console.error("[IntroDebug] confirmDonkeyNameButton not found!");
+        console.error("[IntroDebugCRITICAL] confirmDonkeyNameButton not found!");
     }
 
-    function checkIntroStatus() {
-        console.log("[IntroDebug] checkIntroStatus called.");
-        const hasDoneIntro = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY);
+    function initializeView() { // Was checkIntroStatus
+        console.log("[ViewInit] Initializing view state.");
+        const hasDoneIntro = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY) === 'true';
         const savedName = localStorage.getItem(LOCAL_STORAGE_DONKEY_NAME_KEY);
-        console.log(`[IntroDebug] localStorage - hasDoneIntro: ${hasDoneIntro}, savedName: ${savedName}`);
+        console.log(`[ViewInit] localStorage - hasDoneIntro: ${hasDoneIntro}, savedName: ${savedName}`);
 
-        if (savedName) currentDonkeyName = savedName;
-
-        // --- ADDED DEBUG FOR introOverlay --- 
-        const introOverlay = document.getElementById('intro-sequence-overlay');
-        if (!introOverlay) {
-            console.error("[IntroDebugCRITICAL] introOverlay element NOT FOUND by getElementById!");
+        if (savedName) {
+            currentDonkeyName = savedName;
+            if(donkeyDisplayDiv) donkeyDisplayDiv.textContent = `${currentDonkeyName} the Donkey`; // Update display
         } else {
-            console.log("[IntroDebug] introOverlay found. Current classes:", introOverlay.className);
+            currentDonkeyName = "Barnaby"; // Default if no saved name
+            if(donkeyDisplayDiv) donkeyDisplayDiv.textContent = `${currentDonkeyName} the Donkey`;
         }
-        // --- END ADDED DEBUG ---
+        
+        if (!introOverlay) console.error("[ViewInitCRITICAL] introOverlay element NOT FOUND!");
+        // if (!connectAreaDiv) console.error("[ViewInitCRITICAL] connectAreaDiv element NOT FOUND!"); // For completeness
+        // if (!gameContainerDiv) console.error("[ViewInitCRITICAL] gameContainerDiv element NOT FOUND!"); // For completeness
 
-        if (hasDoneIntro === 'true') {
-            console.log("[IntroDebug] Intro already completed. Showing connect area.");
-            if(introOverlay) introOverlay.classList.add('hidden');
-            else console.error("[IntroDebug] introOverlay element is null in hasDoneIntro branch!"); // Should not happen if above check passes
-            if(connectAreaDiv) connectAreaDiv.classList.remove('hidden');
-            else console.error("[IntroDebug] connectAreaDiv element is null in hasDoneIntro branch!");
+
+        if (!hasDoneIntro) {
+            console.log("[ViewInit] Intro not completed or first run. Setting story to part 0.");
+            currentStoryPart = 0; 
         } else {
-            console.log("[IntroDebug] Intro not completed or first run. Starting intro sequence.");
-            if(introOverlay) {
-                introOverlay.classList.remove('hidden');
-                console.log("[IntroDebug] Called introOverlay.classList.remove('hidden'). New classes:", introOverlay.className);
-            } else {
-                // This path should ideally not be taken if the earlier check is in place
-                console.error("[IntroDebug] introOverlay element is null in fresh intro branch! CANNOT SHOW INTRO.");
-            }
-            if(connectAreaDiv) connectAreaDiv.classList.add('hidden');
-            if(gameContainerDiv) gameContainerDiv.classList.add('hidden');
-            showStoryPart(0);
+            console.log("[ViewInit] Intro already completed.");
+            // currentStoryPart might be irrelevant if intro is done, but doesn't hurt to be out of bounds for story parts
+            currentStoryPart = storyPartElements.length; // Effectively ensures naming page or nothing is shown by showStoryPart if called
         }
+        // All UI showing/hiding is now handled by updateUIVisibility
+        updateUIVisibility();
     }
 
     disconnectButton.addEventListener('click', async () => {
@@ -436,7 +484,7 @@ function initializeAppLogic() {
         }
     });
 
-    checkIntroStatus(); // This will show intro or connect area
+    initializeView(); // This will show intro or connect area via updateUIVisibility
     updateAllDisplays(); // Initial UI setup for default values
 }
 // --------------- APP LOGIC ENDS HERE ----------------- 
