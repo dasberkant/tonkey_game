@@ -8,6 +8,11 @@ import { TonClient, Address, Cell, beginCell, toNano, fromNano } from 'ton';
 //    ({ TonClient, Address, Cell, beginCell, toNano, fromNano } = window.Ton);
 // }
 
+// Helper function to introduce a delay
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram.WebApp;
     tg.ready();
@@ -133,11 +138,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     tonBalanceSpan.textContent = 'Error fetching TON';
                 }
 
-                // Temporarily disable Tonkey balance fetching
+                await sleep(1100); // Wait a bit more than 1 second to be safe
+
                 // Re-enable Tonkey balance fetching
                 userTonkeyWalletAddress = await getJettonWalletAddress(address, tonkeyMasterAddress);
                 if (userTonkeyWalletAddress) {
                     console.log('User Tonkey Wallet Address:', userTonkeyWalletAddress);
+                    
+                    await sleep(1100); // Wait a bit more than 1 second before fetching Jetton balance
+
                     const balance = await getJettonBalance(userTonkeyWalletAddress);
                     if (balance !== null) {
                         tonkeyBalanceSpan.textContent = `${parseFloat(balance).toFixed(2)} TONKEY`; 
