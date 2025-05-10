@@ -170,13 +170,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Helper function for alerts with fallback
+        function showAlertFallback(message) {
+            if (tg && tg.showAlert && typeof tg.showAlert === 'function') {
+                try {
+                    tg.showAlert(message);
+                } catch (e) {
+                    console.warn("tg.showAlert failed, falling back to window.alert:", e);
+                    window.alert(message);
+                }
+            } else {
+                window.alert(message);
+            }
+        }
+
+        // Helper function for confirmations with fallback
+        async function showConfirmFallback(message) {
+            if (tg && tg.showConfirm && typeof tg.showConfirm === 'function') {
+                try {
+                    return await new Promise(resolve => {
+                        tg.showConfirm(message, (ok) => resolve(ok));
+                    });
+                } catch (e) {
+                    console.warn("tg.showConfirm failed, falling back to window.confirm:", e);
+                    return window.confirm(message);
+                }
+            } else {
+                return window.confirm(message);
+            }
+        }
+
         spendButton.addEventListener('click', async () => {
             if (!tonConnectUI.connected || !userTonkeyWalletAddress || !tonClient) {
                 const message = !tonConnectUI.connected ? 'Please connect your wallet.' :
                                 !userTonkeyWalletAddress ? 'Tonkey wallet address not found.' :
                                 'TON client not ready.';
-                if (tg && tg.showAlert) tg.showAlert(message);
-                else alert(message);
+                showAlertFallback(message); // Use fallback
                 return;
             }
 
@@ -202,8 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const amountString = spendAmountInput.value;
             if (!amountString || parseFloat(amountString) <= 0) {
-                if (tg && tg.showAlert) tg.showAlert('Please enter a valid amount to spend.');
-                else alert('Please enter a valid amount to spend.');
+                showAlertFallback('Please enter a valid amount to spend.'); // Use fallback
                 return;
             }
             
@@ -234,37 +262,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Use a more robust way to confirm, checking for tg.showConfirm first
                 let confirmed = false;
-                if (tg && tg.showConfirm) {
-                    confirmed = await new Promise(resolve => {
-                        tg.showConfirm(
-                            `Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`,
-                            (ok) => resolve(ok)
-                        );
-                    });
-                } else if (tg && tg.showPopup) { // Fallback to showPopup if showConfirm is not available
-                     await new Promise(resolve => {
-                        tg.showPopup({
-                            title: 'Confirm Transaction',
-                            message: `Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`,
-                            buttons: [
-                                { id: 'confirm', type: 'default', text: 'Confirm' },
-                                { id: 'cancel', type: 'destructive', text: 'Cancel' },
-                            ]
-                        }, (buttonId) => {
-                            if (buttonId === 'confirm') confirmed = true;
-                            resolve(true); // Close popup handler
-                        });
-                    });
-                } else { // Further fallback to browser confirm
-                    confirmed = confirm(`Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`);
-                }
+                // --- MODIFIED CONFIRMATION LOGIC ---
+                confirmed = await showConfirmFallback(
+                    `Send ${amountString} TONKEY to ${recipientAddress.slice(0,6)}...? This is a REAL transaction.`
+                );
+                // --- END MODIFIED CONFIRMATION LOGIC ---
 
                 if (confirmed) {
                     try {
                         const result = await tonConnectUI.sendTransaction(transaction);
                         console.log('Transaction sent:', result);
-                        if (tg && tg.showAlert) tg.showAlert('Transaction sent successfully! Check your wallet.');
-                        else alert('Transaction sent successfully! Check your wallet.');
+                        showAlertFallback('Transaction sent successfully! Check your wallet.'); // Use fallback
                         if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                         
                         setTimeout(async () => {
@@ -280,17 +288,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Log the full error object for more details
                         console.error('Full transaction error object:', error);
                         const errorMessage = typeof error === 'string' ? error : (error.message || 'Unknown transaction error');
-                        if (tg && tg.showAlert) tg.showAlert('Transaction failed: ' + errorMessage);
-                        else alert('Transaction failed: ' + errorMessage);
+                        showAlertFallback('Transaction failed: ' + errorMessage); // Use fallback
                         if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
                     }
                 }
             } catch (e) {
-                console.error('Error with confirmation popup, address parsing, or transaction preparation:', e);
+                console.error('Error with address parsing, or transaction preparation:', e); // Removed "confirmation popup"
                 // Log the full error object
                 console.error('Full preparation error object:', e);
-                if (tg && tg.showAlert) tg.showAlert('Error preparing transaction: ' + (e.message || 'Unknown error'));
-                else alert('Error preparing transaction: ' + (e.message || 'Unknown error'));
+                showAlertFallback('Error preparing transaction: ' + (e.message || 'Unknown error')); // Use fallback
                 if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             }
         });
