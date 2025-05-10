@@ -27,8 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`TON library not ready, attempt ${pollCount}/${MAX_POLL_COUNT}. Retrying in 500ms...`);
                 setTimeout(checkTonLibAndInit, 500);
             } else {
-                console.error('Failed to load TON library after multiple attempts.');
-                tg.showAlert('Error: TON Blockchain library failed to load. Please try reloading the app.');
+                console.error('CRITICAL: Failed to load TON library after multiple attempts. App functionality will be limited.');
             }
         }
     }
@@ -57,8 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function getTonClient(network) {
             if (!TonClient) {
-                console.error('TonClient is not initialized!');
-                tg.showAlert('Critical error: TonClient not available.');
+                console.error('CRITICAL: TonClient is not initialized! Cannot create TON API client.');
                 return null;
             }
             if (network === 'mainnet') {
@@ -85,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return result.stack.readAddress().toString();
             } catch (error) {
                 console.error('Error getting Jetton wallet address:', error);
-                tg.showAlert('Error getting Jetton wallet address: ' + (error.message || error.toString()));
                 return null;
             }
         }
@@ -102,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (error.message && (error.message.includes('exit_code: -13') || error.message.includes('method not found'))){
                     return '0'; 
                 }
-                tg.showAlert('Error fetching balance: ' + (error.message || error.toString()));
+                console.error('Error fetching balance: ' + (error.message || error.toString()));
                 return null;
             }
         }
