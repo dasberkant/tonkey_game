@@ -21,7 +21,7 @@
     <script type="module" src="script.js" defer></script>
     <link rel="stylesheet" href="style.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Patrick+Hand&display=swap');
 
         @keyframes donkeyBob {
             0%, 100% { transform: translateY(0); }
@@ -32,8 +32,9 @@
             50% { transform: scale(1.1); opacity: 0.7; }
             100% { transform: scale(1); opacity: 1; }
         }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         body {
-            font-family: 'Gloria Hallelujah', 'Comic Sans MS', cursive, sans-serif; /* More playful font */
+            font-family: 'Patrick Hand', 'Gloria Hallelujah', cursive, sans-serif;
             margin: 0;
             padding: 15px;
             background-color: #A0D2DB; /* Lighter, sky blue */
@@ -50,6 +51,7 @@
             margin-bottom: 20px;
             text-shadow: 2px 2px #FFFFFF;
             font-weight: bold;
+            font-family: 'Gloria Hallelujah', cursive;
         }
         .container {
             background-color: #FEF9E7; /* Creamy yellow */
@@ -89,9 +91,24 @@
             color: #D35400; /* Darker terracotta */
             margin-top: 5px;
             margin-bottom: 15px;
+            font-family: 'Gloria Hallelujah', cursive;
         }
-        p, label { font-size: 1.05em; line-height: 1.6; }
+        p, label { font-size: 1.15em; line-height: 1.6; }
         .hidden { display: none !important; }
+        input[type="text"] { padding: 10px; border-radius: 8px; border: 2px solid #FAD7A0; font-family: inherit; font-size: 1em; margin: 10px 0; width: 80%; }
+
+        #intro-sequence-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(254, 249, 231, 0.95); /* Semi-transparent cream */
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .story-page, #donkey-naming-page {
+            background-color: #FFF8DC; /* Cornsilk */
+            padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 3px solid #E57A44;
+            max-width: 90%; width: 500px;
+        }
+        .story-page p { font-size: 1.2em; margin-bottom: 20px; color: #8B4513; /* SaddleBrown */ }
 
         #donkey-display {
             font-size: 5em; /* Bigger Donkey */
@@ -122,6 +139,7 @@
             margin-top: 0;
             color: #BA4A00; /* Darker orange-brown */
             font-size: 1.4em;
+            font-family: 'Gloria Hallelujah', cursive;
         }
         .message-area {
             font-style: italic;
@@ -129,6 +147,7 @@
             min-height: 25px; /* Reserve space */
             margin-top: 10px;
             font-size: 1.1em;
+            transition: opacity 0.3s;
         }
         .error-message {
             color: #E74C3C; /* Red for errors */
@@ -138,12 +157,38 @@
             color: #D35400;
             margin-top: 25px;
         }
+        #disconnect-button { background-color: #C0392B; margin-top: 20px; }
+        #disconnect-button:hover { background-color: #A93226; }
     </style>
 </head>
 <body>
+    <div id="intro-sequence-overlay" class="hidden"> <!-- Initially hidden, JS will show if needed -->
+        <div id="story-part-1" class="story-page hidden">
+            <h2>The Legend of the Lost Carrots!</h2>
+            <p>In the whimsical land of Tonkaria, where rivers flow with carrot juice and mountains shimmer with geodes, lived the Tonkeys - donkeys with an uncanny knack for finding treasure... especially the fabled Lost Carrots of Tonk-a-Mula, said to grant unimaginable luck!</p>
+            <button id="next-story-1">Next &raquo;</button>
+        </div>
+        <div id="story-part-2" class="story-page hidden">
+            <h2>Guardians of the Goodies</h2>
+            <p>But these carrots are cleverly hidden, guarded by mischievous Dust Bunnies and tricky Trail Gnomes. Only a Tonkey with a true heart, guided by a worthy companion, can hope to uncover them.</p>
+            <button id="next-story-2">Onwards! &raquo;</button>
+        </div>
+        <div id="story-part-3" class="story-page hidden">
+            <h2>A Sparkly Arrival!</h2>
+            <p>One day, a young, bright-eyed Tonkey, with a tuft of oddly sparkling fur, trotted up to you. It nudged a dusty map into your hand – a map to Tonk-a-Mula! It seems adventure has chosen you both!</p>
+            <button id="next-story-3">A New Friend! &raquo;</button>
+        </div>
+        <div id="donkey-naming-page" class="story-page hidden">
+            <h2>Name Your Noble Steed!</h2>
+            <p>This is your chance! What will you name your new, adventurous Tonkey friend who will help you on this grand quest?</p>
+            <input type="text" id="donkey-name-input" placeholder="e.g., Sparkle-Hoof" maxlength="20">
+            <button id="confirm-donkey-name">Let's Go, <span id="temp-donkey-name-display">Tonkey</span>!</button>
+        </div>
+    </div>
+
     <h1 id="app-title">Tonkey's Treasure Trail</h1>
 
-    <div id="connect-area" class="container">
+    <div id="connect-area" class="container hidden"> <!-- Initially hidden, JS controls visibility -->
         <h2>Howdy, Partner!</h2>
         <p>Your trusty Tonkey awaits! Connect your wallet to start the adventure.</p>
         <div id="tonconnect-button-root"></div>
@@ -154,7 +199,7 @@
         <div id="donkey-area">
             <h2>Your Loyal Tonkey</h2>
             <div id="donkey-display">🐴</div> 
-            <p id="donkey-name" style="font-weight:bold; color:#BA4A00;">Barnaby</p> <!-- Placeholder name -->
+            <p id="donkey-name" style="font-weight:bold; color:#BA4A00; font-size:1.5em;">Barnaby</p> 
         </div>
 
         <div id="stats-inventory-area">
@@ -163,6 +208,7 @@
             <div class="balance-display">Lucky Hay Bales (LHB): <strong id="lhb-balance">0</strong></div>
             <div class="inventory-item-display">Mystery Geodes: <strong id="geodes-count">0</strong></div>
             <div class="inventory-item-display">Shiny Pebbles: <strong id="pebbles-count">0</strong></div>
+            <div class="inventory-item-display">Ancient Coins: <strong id="ancient-coins-count">0</strong></div>
             <div class="inventory-item-display">Premium Map: <strong id="premium-map-status">None</strong></div>
             <div class="inventory-item-display hidden">Blueprint Fragments: <strong id="blueprint-fragments-count">0</strong></div>
         </div>
@@ -190,6 +236,7 @@
                 <button id="buy-gourmet-oats-button">Buy Oats</button>
             </div>
         </div>
+        <button id="disconnect-button">Disconnect & Leave Trail</button>
     </div>
 
     <!-- Old sections, can be removed fully later if no longer needed for reference by user -->

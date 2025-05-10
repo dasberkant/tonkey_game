@@ -39,6 +39,7 @@ function initializeAppLogic() {
     const lhbBalanceSpan = document.getElementById('lhb-balance');
     const geodesCountSpan = document.getElementById('geodes-count');
     const pebblesCountSpan = document.getElementById('pebbles-count');
+    const ancientCoinsCountSpan = document.getElementById('ancient-coins-count');
     const premiumMapStatusSpan = document.getElementById('premium-map-status');
     const blueprintFragmentsCountSpan = document.getElementById('blueprint-fragments-count'); // For future
 
@@ -53,20 +54,25 @@ function initializeAppLogic() {
     const premiumMapCostSpan = document.getElementById('premium-map-cost'); // Assuming costs are static in HTML for now
     const buyGourmetOatsButton = document.getElementById('buy-gourmet-oats-button');
     const gourmetOatsCostSpan = document.getElementById('gourmet-oats-cost');
+    const disconnectButton = document.getElementById('disconnect-button');
 
     // Game Constants & State
     const tonkeyMasterAddress = 'EQCn9sEMALm9Np1tkKZmKuK9h9z1mSbyDWQOPOup9mhe5pFB';
     const SHOP_RECIPIENT_ADDRESS = 'UQC4PB_Zs2z-1CetayPu1qE5yokaoZCoYc2TIrb3ZZDMwUIj'; // Placeholder
     const EXPLORE_COST_LHB = 5;
+    const LOCAL_STORAGE_INTRO_KEY = 'hasCompletedIntro_TonkeyTrail_v1'; // Versioned key
+    const LOCAL_STORAGE_DONKEY_NAME_KEY = 'tonkeyTrailDonkeyName_v1';
 
     let userTonkeyWalletAddress = null;
     let tonClient = null;
     let userWalletAddress = null; // Raw user address from wallet connection
+    let currentDonkeyName = "Barnaby"; // Default
 
     // Player Game State
     let luckyHayBales = 50; // Start with some LHB
     let mysteryGeodesCount = 0;
     let shinyPebblesCount = 0;
+    let ancientCoinsCount = 0;
     let hasPremiumMap = false;
     let blueprintFragmentsCount = 0; // For future use
 
@@ -97,7 +103,9 @@ function initializeAppLogic() {
         lhbBalanceSpan.textContent = luckyHayBales;
         geodesCountSpan.textContent = mysteryGeodesCount;
         pebblesCountSpan.textContent = shinyPebblesCount;
+        ancientCoinsCountSpan.textContent = ancientCoinsCount;
         premiumMapStatusSpan.textContent = hasPremiumMap ? "Active! Next explore is special." : "None";
+        premiumMapStatusSpan.style.color = hasPremiumMap ? '#27AE60' : 'inherit';
         blueprintFragmentsCountSpan.textContent = blueprintFragmentsCount;
         
         crackGeodeButton.disabled = mysteryGeodesCount === 0;
@@ -149,7 +157,6 @@ function initializeAppLogic() {
     function showTemporaryMessage(element, message, duration = 3000, isError = false) {
         element.textContent = message;
         element.classList.toggle('error-message', isError);
-        element.classList.remove('itemPop'); // remove animation class if it exists
         void element.offsetWidth; // trigger reflow to restart animation
         element.classList.add('itemPop'); // Add animation class
         setTimeout(() => {
@@ -161,34 +168,49 @@ function initializeAppLogic() {
 
     exploreButton.addEventListener('click', () => {
         if (luckyHayBales < EXPLORE_COST_LHB) {
-            showTemporaryMessage(exploreMessageP, "Barnaby needs more LHB for an adventure!", 3000, true);
+            showTemporaryMessage(exploreMessageP, `${currentDonkeyName} needs more LHB for an adventure!`, 3000, true);
             if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             return;
         }
         luckyHayBales -= EXPLORE_COST_LHB;
-        let foundLHB = Math.floor(Math.random() * 8) + 3; // 3-10 LHB
+        let foundLHB = 0;
         let foundGeode = false;
+        let foundPebbles = 0;
+        let foundAncientCoin = false;
+        let outcomeMessage = "";
 
         if (hasPremiumMap) {
             foundGeode = true;
-            hasPremiumMap = false; // Consume the map
-            showTemporaryMessage(exploreMessageP, "✨ Using the Premium Map... Barnaby found a Mystery Geode!", 4000);
-            setTimeout(() => showTemporaryMessage(exploreMessageP, `And ${foundLHB} LHB too! What a clever Tonkey!`), 2000); 
-        } else if (Math.random() < 0.25) { // 25% chance to find a geode without map
-            foundGeode = true;
+            hasPremiumMap = false; 
+            foundLHB = Math.floor(Math.random() * 5) + 3; // 3-7 LHB with map
+            luckyHayBales += foundLHB;
+            outcomeMessage = `✨ Using the Premium Map, ${currentDonkeyName} unerringly led you to a Mystery Geode and ${foundLHB} LHB!`;
+            showTemporaryMessage(exploreMessageP, outcomeMessage, 4000);
+        } else {
+            const roll = Math.random();
+            if (roll < 0.01) { // 1% nothing
+                foundLHB = Math.floor(Math.random()*2)+1; // 1-2 LHB consolation
+                luckyHayBales += foundLHB;
+                outcomeMessage = `${currentDonkeyName} got distracted by a pretty butterfly but still found ${foundLHB} LHB.`;
+            } else if (roll < 0.05) { // 4% Ancient Coin (total 5% rare tier)
+                foundAncientCoin = true;
+                ancientCoinsCount++;
+                outcomeMessage = `Incredible! ${currentDonkeyName} sniffed out a rare Ancient Coin! These look valuable...`;
+            } else if (roll < 0.20) { // 15% Shiny Pebbles (total 20% uncommon tier)
+                foundPebbles = Math.floor(Math.random() * 3) + 1;
+                shinyPebblesCount += foundPebbles;
+                outcomeMessage = `${currentDonkeyName} kicked up some dust and uncovered ${foundPebbles} Shiny Pebbles!`;
+            } else if (roll < 0.40) { // 20% Geode (total 40% good tier)
+                foundGeode = true;
+                mysteryGeodesCount++;
+                outcomeMessage = `Great Scott! ${currentDonkeyName}'s keen eyes spotted a Mystery Geode!`;
+            } else { // 60% Common LHB
+                foundLHB = Math.floor(Math.random() * 11) + 5; // 5-15 LHB
+                luckyHayBales += foundLHB;
+                outcomeMessage = `${currentDonkeyName} munched on some grass and found ${foundLHB} Lucky Hay Bales!`;
+            }
+            showTemporaryMessage(exploreMessageP, outcomeMessage, 3500);
         }
-
-        luckyHayBales += foundLHB;
-        let message = `Barnaby explored and found ${foundLHB} LHB!`;
-        if (foundGeode) {
-            mysteryGeodesCount++;
-            message = `Yahoo! Barnaby found ${foundLHB} LHB and a Mystery Geode!`;
-        }
-        
-        if (!hasPremiumMap || !foundGeode) { // Avoid double messaging if map was used.
-            showTemporaryMessage(exploreMessageP, message);
-        }
-
         updateAllDisplays();
         if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
     });
@@ -200,22 +222,11 @@ function initializeAppLogic() {
             return;
         }
         mysteryGeodesCount--;
-        let resultMessage = "You crack open the geode... ";
+        let resultMessage = `${currentDonkeyName} carefully cracks open the geode... `;
         const randomRoll = Math.random();
-
-        if (randomRoll < 0.6) { // 60% chance for LHB
-            const foundLHB = Math.floor(Math.random() * 20) + 10; // 10-29 LHB
-            luckyHayBales += foundLHB;
-            resultMessage += `and find ${foundLHB} LHB! Sweet as hay!`;
-        } else if (randomRoll < 0.9) { // 30% chance for Shiny Pebbles
-            const foundPebbles = Math.floor(Math.random() * 3) + 1; // 1-3 Pebbles
-            shinyPebblesCount += foundPebbles;
-            resultMessage += `it reveals ${foundPebbles} Shiny Pebble(s)! Sparkly!`;
-        } else { // 10% chance for a Blueprint Fragment (rare)
-            blueprintFragmentsCount++;
-            resultMessage += `WOW! A rare Blueprint Fragment! Wonder what this makes?`;
-            document.getElementById('blueprint-fragments-count').parentElement.classList.remove('hidden'); // Show if found
-        }
+        if (randomRoll < 0.6) { const foundLHB = Math.floor(Math.random()*20)+10; luckyHayBales+=foundLHB; resultMessage+=`and find ${foundLHB} LHB! Sweet as hay!`;}
+        else if (randomRoll < 0.9) { const foundPebbles = Math.floor(Math.random()*3)+1; shinyPebblesCount+=foundPebbles; resultMessage+=`it reveals ${foundPebbles} Shiny Pebble(s)! Sparkly!`;}
+        else { blueprintFragmentsCount++; resultMessage+=`WOW! A rare Blueprint Fragment! Wonder what this makes?`; document.getElementById('blueprint-fragments-count').parentElement.classList.remove('hidden');}
         showTemporaryMessage(geodeMessageP, resultMessage, 4000);
         updateAllDisplays();
         if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
@@ -248,7 +259,7 @@ function initializeAppLogic() {
                 }]
             };
             await tonConnectUI.sendTransaction(transaction);
-            showTemporaryMessage(geodeMessageP, `${itemName} is yours! Happy trails!`, 3000); // Using geodeMessageP for shop success temporarily
+            showTemporaryMessage(geodeMessageP, `${itemName} is yours, happy trails with ${currentDonkeyName}!`, 3000);
             if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             if (successCallback) successCallback();
             updateAllDisplays(); // Update displays immediately after callback
@@ -264,7 +275,7 @@ function initializeAppLogic() {
         const cost = premiumMapCostSpan.textContent;
         handleShopPurchase('Premium Expedition Map', cost, () => {
             if(hasPremiumMap) {
-                showTemporaryMessage(geodeMessageP, "You already have a Premium Map, Tonkey!");
+                showTemporaryMessage(geodeMessageP, `Your Tonkey, ${currentDonkeyName}, already has a Premium Map!`);
                 return; // Prevent buying multiple if we want to limit it
             }
             hasPremiumMap = true;
@@ -297,7 +308,7 @@ function initializeAppLogic() {
             gameContainerDiv.classList.add('hidden');
             tonkeyBalanceGameSpan.textContent = '--';
              // Reset game state on disconnect for simplicity, or persist via localStorage later
-            luckyHayBales = 50; mysteryGeodesCount = 0; shinyPebblesCount = 0; hasPremiumMap = false; blueprintFragmentsCount = 0;
+            luckyHayBales = 50; mysteryGeodesCount = 0; shinyPebblesCount = 0; ancientCoinsCount = 0; hasPremiumMap = false; blueprintFragmentsCount = 0;
             updateAllDisplays(); 
             if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
@@ -305,12 +316,89 @@ function initializeAppLogic() {
     });
 
     if (tg && tg.MainButton) {
-        tg.MainButton.setText('Close Stable');
+        tg.MainButton.setText('Close Trail');
         tg.MainButton.textColor = '#FFFFFF';
         tg.MainButton.color = '#AF601A'; // Donkey brown
         tg.MainButton.show();
         tg.MainButton.onClick(() => { tg.close(); });
     }
-    updateAllDisplays(); // Initial UI setup
+
+    // --- Intro Sequence Logic ---
+    let currentStoryPart = 0;
+    function showStoryPart(index) {
+        const storyParts = [
+            document.getElementById('story-part-1'),
+            document.getElementById('story-part-2'),
+            document.getElementById('story-part-3')
+        ];
+        storyParts.forEach((part, i) => part.classList.toggle('hidden', i !== index));
+        if (index >= storyParts.length) { // End of story, show naming
+            const donkeyNamingPage = document.getElementById('donkey-naming-page');
+            donkeyNamingPage.classList.remove('hidden');
+        }
+    }
+
+    const nextStoryButtons = [
+        document.getElementById('next-story-1'),
+        document.getElementById('next-story-2'),
+        document.getElementById('next-story-3')
+    ];
+
+    nextStoryButtons.forEach((button, index) => {
+        button.addEventListener('click', () => {
+            currentStoryPart = index + 1;
+            showStoryPart(currentStoryPart);
+        });
+    });
+
+    const donkeyNamingPage = document.getElementById('donkey-naming-page');
+    const donkeyNameInput = document.getElementById('donkey-name-input');
+    const confirmDonkeyNameButton = document.getElementById('confirm-donkey-name');
+    const tempDonkeyNameDisplay = document.getElementById('temp-donkey-name-display');
+
+    donkeyNameInput.addEventListener('input', () => {
+        tempDonkeyNameDisplay.textContent = donkeyNameInput.value.trim() || "Tonkey";
+    });
+
+    confirmDonkeyNameButton.addEventListener('click', () => {
+        const name = donkeyNameInput.value.trim();
+        if (name && name.length > 0 && name.length <= 20) {
+            currentDonkeyName = name;
+            localStorage.setItem(LOCAL_STORAGE_DONKEY_NAME_KEY, currentDonkeyName);
+            localStorage.setItem(LOCAL_STORAGE_INTRO_KEY, 'true');
+            donkeyNamingPage.classList.add('hidden');
+            connectAreaDiv.classList.remove('hidden'); 
+            updateAllDisplays(); // Update name on main game screen
+        } else {
+            showAlertFallback('Please give your Tonkey a name (1-20 characters)!');
+        }
+    });
+
+    function checkIntroStatus() {
+        const hasDoneIntro = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY);
+        const savedName = localStorage.getItem(LOCAL_STORAGE_DONKEY_NAME_KEY);
+        if (savedName) currentDonkeyName = savedName;
+
+        if (hasDoneIntro === 'true') {
+            donkeyNamingPage.classList.add('hidden');
+            connectAreaDiv.classList.remove('hidden');
+        } else {
+            donkeyNamingPage.classList.remove('hidden');
+            connectAreaDiv.classList.add('hidden');
+            gameContainerDiv.classList.add('hidden');
+            showStoryPart(0);
+        }
+    }
+
+    disconnectButton.addEventListener('click', async () => {
+        if (tonConnectUI.connected) {
+            await tonConnectUI.disconnect();
+            // onStatusChange will handle UI changes and state reset
+            showAlertFallback('You have left the trail. Come back soon!');
+        }
+    });
+
+    checkIntroStatus(); // This will show intro or connect area
+    updateAllDisplays(); // Initial UI setup for default values
 }
 // --------------- APP LOGIC ENDS HERE ----------------- 
