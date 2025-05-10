@@ -4,7 +4,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "parcel index.html",
-    "build": "parcel build index.html --dist-dir docs --public-url ./"
+    "build": "parcel build index.html --dist-dir docs --public-url ./ && copyfiles tonconnect-manifest.json docs"
   },
   "repository": {
     "type": "git",
@@ -24,6 +24,7 @@
     "ton": "^13.9.0"
   },
   "devDependencies": {
-    "buffer": "^6.0.3"
+    "buffer": "^6.0.3",
+    "copyfiles": "^2.4.1"
   }
 }
