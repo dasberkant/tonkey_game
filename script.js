@@ -164,14 +164,15 @@ function initializeAppLogic() {
     // --- UI Update Functions ---
     function updateAllDisplays() {
         // Update persistent top-right balances
-        if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = userTonkeyWalletAddress ? tonkeyBalanceGameSpan.textContent : '--'; // Use fetched balance
-        else console.error("topTonkeyBalanceSpan not found");
+        // The line that was here trying to set topTonkeyBalanceSpan.textContent has been removed.
+        // topTonkeyBalanceSpan is updated by fetchAndDisplayTonkeyBalance() or by onStatusChange() upon disconnect.
+        
         if (topLhbBalanceSpan) topLhbBalanceSpan.textContent = luckyHayBales;
         else console.error("topLhbBalanceSpan not found");
 
         // Update balances in the Inventory Tab
-        // Note: tonkeyBalanceGameSpan might have been removed from the inventory tab. If so, this line for it is not needed here.
-        // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = userTonkeyWalletAddress ? 'SEE TOP RIGHT' : '--'; 
+        // Note: tonkeyBalanceGameSpan (the variable for an element with id 'tonkey-balance-game') is null 
+        // because the HTML element was removed. So, no update needed for it here.
         if (lhbBalanceSpan) lhbBalanceSpan.textContent = luckyHayBales;
         else console.error("lhbBalanceSpan (inventory tab) not found");
 
@@ -441,6 +442,9 @@ function initializeAppLogic() {
             // Reset game state on disconnect
             luckyHayBales = 50; mysteryGeodesCount = 0; shinyPebblesCount = 0; ancientCoinsCount = 0; hasPremiumMap = false; blueprintFragmentsCount = 0;
             currentDonkeyName = "Barnaby"; // Reset name on disconnect if not persisted elsewhere or re-fetched
+            
+            if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = '--'; // Explicitly clear Tonkey balance on disconnect
+
             // Consider if donkey name should also be cleared from localStorage on disconnect, or if it persists. For now, it persists.
         }
 
