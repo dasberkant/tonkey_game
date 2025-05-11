@@ -50,9 +50,18 @@ function initializeAppLogic() {
     const gameContainerDiv = document.getElementById('game-container');
     console.log('[DOM CHECK] gameContainerDiv:', gameContainerDiv ? 'Found' : 'NOT FOUND');
     const donkeyDisplayDiv = document.getElementById('donkey-display'); // For animations
+    const donkeyNameP = document.getElementById('donkey-name'); // Get the donkey name paragraph
     
-    // UI Elements - Stats & Inventory
-    const tonkeyBalanceGameSpan = document.getElementById('tonkey-balance-game');
+    // UI Elements - Persistent Balances (Top Right)
+    const topTonkeyBalanceSpan = document.getElementById('top-tonkey-balance');
+    const topLhbBalanceSpan = document.getElementById('top-lhb-balance');
+
+    // UI Elements - Tabs
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+    
+    // UI Elements - Stats & Inventory (within Inventory Tab)
+    const tonkeyBalanceGameSpan = document.getElementById('tonkey-balance-game'); // This might be null if removed from HTML, adjust if so
     const lhbBalanceSpan = document.getElementById('lhb-balance');
     const geodesCountSpan = document.getElementById('geodes-count');
     const pebblesCountSpan = document.getElementById('pebbles-count');
@@ -154,21 +163,38 @@ function initializeAppLogic() {
 
     // --- UI Update Functions ---
     function updateAllDisplays() {
-        lhbBalanceSpan.textContent = luckyHayBales;
-        geodesCountSpan.textContent = mysteryGeodesCount;
-        pebblesCountSpan.textContent = shinyPebblesCount;
-        ancientCoinsCountSpan.textContent = ancientCoinsCount;
-        premiumMapStatusSpan.textContent = hasPremiumMap ? "Active! Next explore is special." : "None";
-        premiumMapStatusSpan.style.color = hasPremiumMap ? '#27AE60' : 'inherit';
-        blueprintFragmentsCountSpan.textContent = blueprintFragmentsCount;
+        // Update persistent top-right balances
+        if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = userTonkeyWalletAddress ? tonkeyBalanceGameSpan.textContent : '--'; // Use fetched balance
+        else console.error("topTonkeyBalanceSpan not found");
+        if (topLhbBalanceSpan) topLhbBalanceSpan.textContent = luckyHayBales;
+        else console.error("topLhbBalanceSpan not found");
+
+        // Update balances in the Inventory Tab
+        // Note: tonkeyBalanceGameSpan might have been removed from the inventory tab. If so, this line for it is not needed here.
+        // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = userTonkeyWalletAddress ? 'SEE TOP RIGHT' : '--'; 
+        if (lhbBalanceSpan) lhbBalanceSpan.textContent = luckyHayBales;
+        else console.error("lhbBalanceSpan (inventory tab) not found");
+
+        if (geodesCountSpan) geodesCountSpan.textContent = mysteryGeodesCount;
+        else console.error("geodesCountSpan not found");
+        if (pebblesCountSpan) pebblesCountSpan.textContent = shinyPebblesCount;
+        else console.error("pebblesCountSpan not found");
+        if (ancientCoinsCountSpan) ancientCoinsCountSpan.textContent = ancientCoinsCount;
+        else console.error("ancientCoinsCountSpan not found");
+        if (premiumMapStatusSpan) {
+            premiumMapStatusSpan.textContent = hasPremiumMap ? "Active! Next explore is special." : "None";
+            premiumMapStatusSpan.style.color = hasPremiumMap ? '#27AE60' : 'inherit';
+        } else console.error("premiumMapStatusSpan not found");
+        if (blueprintFragmentsCountSpan) blueprintFragmentsCountSpan.textContent = blueprintFragmentsCount;
+        else console.error("blueprintFragmentsCountSpan not found");
         
-        crackGeodeButton.disabled = mysteryGeodesCount === 0;
-        exploreButton.textContent = `Go Exploring! (-${EXPLORE_COST_LHB} LHB)`;
-        if(hasPremiumMap) {
-             premiumMapStatusSpan.style.color = '#27AE60'; // Green if active
-        } else {
-            premiumMapStatusSpan.style.color = 'inherit'; // Default color
-        }
+        if (crackGeodeButton) crackGeodeButton.disabled = mysteryGeodesCount === 0;
+        else console.error("crackGeodeButton not found");
+        if (exploreButton) exploreButton.textContent = `Go Exploring! (-${EXPLORE_COST_LHB} LHB)`;
+        else console.error("exploreButton not found");
+        
+        if (donkeyNameP) donkeyNameP.textContent = currentDonkeyName; // Update donkey name display
+        else console.error("donkeyNameP not found");
     }
 
     // --- TON Blockchain Interaction Functions (getTonClient, getJettonWalletAddress, getJettonBalance - Keep largely as is) ---
@@ -195,14 +221,22 @@ function initializeAppLogic() {
         }
     }
     async function fetchAndDisplayTonkeyBalance() {
-        if (!userWalletAddress || !tonClient) { tonkeyBalanceGameSpan.textContent = 'N/A'; return; }
-        tonkeyBalanceGameSpan.textContent = '...'; // Fetching indicator
+        if (!userWalletAddress || !tonClient) { 
+            if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = 'N/A'; 
+            // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = 'N/A'; // If it still exists
+            return; 
+        }
+        if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = '...'; // Fetching indicator for top display
+        // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = '...'; // Fetching indicator for tab display if it exists
+
         userTonkeyWalletAddress = await getJettonWalletAddress(userWalletAddress, tonkeyMasterAddress);
         if (userTonkeyWalletAddress) {
             const balance = await getJettonBalance(userTonkeyWalletAddress);
-            tonkeyBalanceGameSpan.textContent = balance;
+            if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = balance;
+            // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = balance; // If it still exists
         } else {
-            tonkeyBalanceGameSpan.textContent = '0.00 (No Jetton Wallet)';
+            if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = '0.00';
+            // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = '0.00 (No Jetton Wallet)'; // If it still exists
         }
     }
     // --- End TON Blockchain Interaction ---
@@ -345,6 +379,49 @@ function initializeAppLogic() {
     });
     // --- End Game Logic ---
 
+    // --- Tab Navigation Logic ---
+    function showTab(tabIdToShow) {
+        console.log("[Tabs] Attempting to show tab:", tabIdToShow);
+        tabPanels.forEach(panel => {
+            if (panel) {
+                panel.classList.add('hidden');
+            } else {
+                console.error("[Tabs] A tab panel element is null.");
+            }
+        });
+        const panelToShow = document.getElementById(tabIdToShow);
+        if (panelToShow) {
+            panelToShow.classList.remove('hidden');
+            console.log("[Tabs] Successfully shown tab:", tabIdToShow);
+        } else {
+            console.error("[Tabs] Panel to show not found:", tabIdToShow);
+        }
+
+        tabButtons.forEach(button => {
+            if (button) {
+                button.classList.remove('active');
+                if (button.getAttribute('data-tab') === tabIdToShow) {
+                    button.classList.add('active');
+                }
+            } else {
+                console.error("[Tabs] A tab button element is null.");
+            }
+        });
+    }
+
+    tabButtons.forEach(button => {
+        if (button) {
+            button.addEventListener('click', () => {
+                const tabId = button.getAttribute('data-tab');
+                if (tabId) {
+                    showTab(tabId);
+                }
+            });
+        } else {
+            console.error("[Tabs] Failed to attach listener: A tab button element is null.");
+        }
+    });
+
     // --- Initialization & Wallet Connection Handling ---
     tonConnectUI.onStatusChange(async wallet => {
         console.log("[Debug] onStatusChange triggered. Wallet:", wallet ? wallet.account.address : 'null');
@@ -461,10 +538,10 @@ function initializeAppLogic() {
 
         if (savedName) {
             currentDonkeyName = savedName;
-            if(donkeyDisplayDiv) donkeyDisplayDiv.textContent = `${currentDonkeyName} the Donkey`; // Update display
+            if(donkeyNameP) donkeyNameP.textContent = currentDonkeyName; // Update display using the new p tag
         } else {
             currentDonkeyName = "Barnaby"; // Default if no saved name
-            if(donkeyDisplayDiv) donkeyDisplayDiv.textContent = `${currentDonkeyName} the Donkey`;
+            if(donkeyNameP) donkeyNameP.textContent = currentDonkeyName;
         }
         
         if (!introOverlay) console.error("[ViewInitCRITICAL] introOverlay element NOT FOUND!");
@@ -493,6 +570,7 @@ function initializeAppLogic() {
     });
 
     initializeView(); // This will show intro or connect area via updateUIVisibility
+    showTab('actions-tab-content'); // Show the Actions tab by default when the game loads (if not in intro)
     updateAllDisplays(); // Initial UI setup for default values
 }
 // --------------- APP LOGIC ENDS HERE ----------------- 

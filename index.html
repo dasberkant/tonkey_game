@@ -159,6 +159,59 @@
         }
         #disconnect-button { background-color: #C0392B; margin-top: 20px; }
         #disconnect-button:hover { background-color: #A93226; }
+
+        /* Tab Styles */
+        #tab-navigation {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #FAD7A0; /* Light orange border */
+        }
+        .tab-button {
+            padding: 10px 15px;
+            cursor: pointer;
+            background-color: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 1.2em;
+            color: #AF601A; /* Brownish orange */
+            font-family: 'Gloria Hallelujah', cursive;
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            color: #E57A44; /* Terracotta/Orange */
+            border-bottom: 3px solid #E57A44;
+            font-weight: bold;
+        }
+        .tab-button:hover:not(.active) {
+            background-color: #FDF2E9; /* Very light peach for hover */
+            color: #D35400; /* Darker terracotta */
+        }
+        .tab-panel {
+            padding-top: 15px;
+            animation: fadeIn 0.4s ease-in-out; /* Fade in tab content */
+        }
+
+        /* Persistent Balances Top-Right */
+        #persistent-balances {
+            position: fixed; /* Changed from absolute for better viewport adherence */
+            top: 10px;
+            right: 15px;
+            background-color: rgba(254, 249, 231, 0.85); /* Creamy yellow with some transparency */
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 100; /* Ensure it's above other non-modal content */
+            font-size: 0.95em;
+            color: #AF601A;
+            border: 1px solid #FAD7A0;
+        }
+        #persistent-balances span {
+            margin: 0 5px;
+        }
+        #persistent-balances strong {
+            color: #D35400;
+        }
     </style>
 </head>
 <body>
@@ -196,46 +249,64 @@
     </div>
 
     <div id="game-container" class="container hidden">
+        <div id="persistent-balances">
+            <span>Tonkeys: <strong id="top-tonkey-balance">--</strong></span> | 
+            <span>LHB: <strong id="top-lhb-balance">0</strong></span>
+        </div>
+
         <div id="donkey-area">
             <h2>Your Loyal Tonkey</h2>
             <div id="donkey-display">🐴</div> 
             <p id="donkey-name" style="font-weight:bold; color:#BA4A00; font-size:1.5em;">Barnaby</p> 
         </div>
 
-        <div id="stats-inventory-area">
-            <h2>Trail Supplies & Treasures</h2>
-            <div class="balance-display">Tonkey Tokens: <strong id="tonkey-balance-game">--</strong></div>
-            <div class="balance-display">Lucky Hay Bales (LHB): <strong id="lhb-balance">0</strong></div>
-            <div class="inventory-item-display">Mystery Geodes: <strong id="geodes-count">0</strong></div>
-            <div class="inventory-item-display">Shiny Pebbles: <strong id="pebbles-count">0</strong></div>
-            <div class="inventory-item-display">Ancient Coins: <strong id="ancient-coins-count">0</strong></div>
-            <div class="inventory-item-display">Premium Map: <strong id="premium-map-status">None</strong></div>
-            <div class="inventory-item-display hidden">Blueprint Fragments: <strong id="blueprint-fragments-count">0</strong></div>
-        </div>
-        
-        <div class="action-section">
-            <h2>Tonkey Actions</h2>
-            <button id="explore-button">Go Exploring! (-5 LHB)</button>
-            <p id="explore-message" class="message-area"></p>
-            <button id="crack-geode-button" disabled>Crack a Geode!</button>
-            <p id="geode-message" class="message-area"></p>
+        <div id="tab-navigation">
+            <button class="tab-button active" data-tab="actions-tab-content">Actions</button>
+            <button class="tab-button" data-tab="shop-tab-content">Shop</button>
+            <button class="tab-button" data-tab="inventory-tab-content">Supplies & Treasures</button>
         </div>
 
-        <div id="shop-area" style="margin-top: 30px;">
-            <h2>Dusty Hoof Stable (Shop)</h2>
-            <div class="shop-item">
-                <h3>Premium Expedition Map</h3>
-                <p>Guarantees a Mystery Geode on your next exploration. One-time use.</p>
-                <p>Cost: <strong id="premium-map-cost">10</strong> Tonkey Tokens</p>
-                <button id="buy-premium-map-button">Buy Map</button>
-            </div>
-            <div class="shop-item">
-                <h3>Gourmet Oats Package</h3>
-                <p>A big bag of tasty oats! Grants 100 LHB.</p>
-                <p>Cost: <strong id="gourmet-oats-cost">5</strong> Tonkey Tokens</p>
-                <button id="buy-gourmet-oats-button">Buy Oats</button>
+        <div id="actions-tab-content" class="tab-panel">
+            <div class="action-section">
+                <h2>Tonkey Actions</h2>
+                <button id="explore-button">Go Exploring! (-5 LHB)</button>
+                <p id="explore-message" class="message-area"></p>
+                <button id="crack-geode-button" disabled>Crack a Geode!</button>
+                <p id="geode-message" class="message-area"></p>
             </div>
         </div>
+
+        <div id="shop-tab-content" class="tab-panel hidden">
+            <div id="shop-area" style="margin-top: 0;"> <!-- Removed specific margin-top from here, handled by tab-panel padding -->
+                <h2>Dusty Hoof Stable (Shop)</h2>
+                <div class="shop-item">
+                    <h3>Premium Expedition Map</h3>
+                    <p>Guarantees a Mystery Geode on your next exploration. One-time use.</p>
+                    <p>Cost: <strong id="premium-map-cost">10</strong> Tonkey Tokens</p>
+                    <button id="buy-premium-map-button">Buy Map</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Gourmet Oats Package</h3>
+                    <p>A big bag of tasty oats! Grants 100 LHB.</p>
+                    <p>Cost: <strong id="gourmet-oats-cost">5</strong> Tonkey Tokens</p>
+                    <button id="buy-gourmet-oats-button">Buy Oats</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="inventory-tab-content" class="tab-panel hidden">
+            <div id="stats-inventory-area">
+                <h2>Your Supplies & Treasures</h2>
+                <!-- Tonkey Tokens are now in the persistent top-right display -->
+                <div class="balance-display">Lucky Hay Bales (LHB): <strong id="lhb-balance">0</strong></div>
+                <div class="inventory-item-display">Mystery Geodes: <strong id="geodes-count">0</strong></div>
+                <div class="inventory-item-display">Shiny Pebbles: <strong id="pebbles-count">0</strong></div>
+                <div class="inventory-item-display">Ancient Coins: <strong id="ancient-coins-count">0</strong></div>
+                <div class="inventory-item-display">Premium Map: <strong id="premium-map-status">None</strong></div>
+                <div class="inventory-item-display hidden">Blueprint Fragments: <strong id="blueprint-fragments-count">0</strong></div>
+            </div>
+        </div>
+        
         <button id="disconnect-button">Disconnect & Leave Trail</button>
     </div>
 
