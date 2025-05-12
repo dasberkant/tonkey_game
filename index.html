@@ -263,6 +263,7 @@
         <div id="tab-navigation">
             <button class="tab-button active" data-tab="actions-tab-content">Actions</button>
             <button class="tab-button" data-tab="shop-tab-content">Shop</button>
+            <button class="tab-button" data-tab="map-tab-content">Map</button>
             <button class="tab-button" data-tab="inventory-tab-content">Supplies & Treasures</button>
         </div>
 
@@ -307,6 +308,15 @@
             </div>
         </div>
         
+        <div id="map-tab-content" class="tab-panel hidden">
+            <h2>Trail Map</h2>
+            <p>Guide your Tonkey to explore new areas!</p>
+            <div id="map-grid-container">
+                <!-- Map grid will be generated here by JavaScript -->
+            </div>
+            <p id="map-message" class="message-area"></p>
+        </div>
+
         <button id="disconnect-button">Disconnect & Leave Trail</button>
     </div>
 

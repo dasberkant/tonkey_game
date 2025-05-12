@@ -53,4 +53,43 @@ input[type="number"] {
 #tonkey-balance {
     font-weight: bold;
     color: green;
+}
+
+/* Add styles for the Map Tab if needed */
+
+#map-grid-container {
+    display: grid;
+    /* grid-template-columns will be set by JS based on map size */
+    grid-gap: 2px; /* Small gap between cells */
+    border: 1px solid #ccc;
+    margin-top: 15px;
+    max-width: 500px; /* Adjust as needed */
+    max-height: 500px; /* Adjust as needed */
+    aspect-ratio: 1 / 1; /* Make it square */
+    background-color: #e0e0e0; /* Light grey background for the grid area */
+}
+
+.map-cell {
+    aspect-ratio: 1 / 1; /* Make cells square */
+    background-color: #a0a0a0; /* Default 'undiscovered' color (fog) */
+    border: 1px solid #ffffff40; /* Slight border */
+    /* Add transitions for smoother reveal later if desired */
+    /* transition: background-color 0.5s ease; */
+}
+
+.map-cell.discovered {
+    background-color: #c8e6c9; /* Light green for discovered */
+}
+
+/* Optional: Add more states later like 'special-interest' */
+/*
+.map-cell.special-interest {
+    background-color: #fff9c4; 
+    border: 1px solid gold;
+}
+*/
+
+#map-message {
+    margin-top: 10px;
+    font-style: italic;
 } 

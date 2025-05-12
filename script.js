@@ -104,25 +104,67 @@ function initializeAppLogic() {
 
     const CHAIN = { MAINNET: '-239', TESTNET: '-3' };
 
-    // --- Helper Functions (showAlertFallback, showConfirmFallback - Keep as is) ---
-    function showAlertFallback(message) {
-        if (tg && tg.showAlert && typeof tg.showAlert === 'function') {
-            try { tg.showAlert(message); } catch (e) { window.alert(message); }
-        } else { window.alert(message); }
-    }
-    async function showConfirmFallback(message) {
-        if (tg && tg.showConfirm && typeof tg.showConfirm === 'function') {
-            try { return await new Promise(resolve => { tg.showConfirm(message, (ok) => resolve(ok)); }); }
-            catch (e) { return window.confirm(message); }
-        } else { return window.confirm(message); }
-    }
-    // --- End Helper Functions ---
+    // Map Constants
+    const LHB_REWARD_MIN = 1;
+    const LHB_REWARD_MAX = 10;
+    const ITEM_FIND_CHANCE = 0.15; // 15% chance to find an item
+    const PREMIUM_MAP_COST = 100; // Cost in LHB - Note: Shop purchase uses Tonkey Token cost
+    const MAP_ROWS = 10; // Map dimensions
+    const MAP_COLS = 10;
+
+    // State Variables
+    let mapData = []; // Map state variable is needed
+    const mapGridContainer = document.getElementById('map-grid-container');
+    const mapMessage = document.getElementById('map-message');
 
     const tonConnectUI = new TonConnectUI({
         manifestUrl: 'https://dasberkant.github.io/tonkey_game/tonconnect-manifest.json', // Ensure this is your GitHub Pages URL
         buttonRootId: 'tonconnect-button-root',
         uiOptions: { twaReturnUrl: 'https://dasberkant.github.io/tonkey_game/' }
     });
+
+    // --- Map Functions (defined inside initializeAppLogic) ---
+    function initializeMap() {
+        // Only init if needed (e.g., load failed or dimensions changed)
+        if (!mapData || mapData.length !== MAP_ROWS || (mapData.length > 0 && (!mapData[0] || mapData[0].length !== MAP_COLS))) {
+            mapData = [];
+            for (let r = 0; r < MAP_ROWS; r++) {
+                mapData[r] = [];
+                for (let c = 0; c < MAP_COLS; c++) {
+                    mapData[r][c] = 0; // 0 = undiscovered
+                }
+            }
+            console.log("Map initialized with default values.");
+        } else {
+            console.log("Map already populated, possibly from saved state.");
+        }
+    }
+
+    function renderMap() {
+        if (!mapGridContainer) {
+            console.warn("Map grid container not found during renderMap!");
+            return;
+        }
+        mapGridContainer.innerHTML = ''; // Clear previous grid
+        mapGridContainer.style.gridTemplateColumns = `repeat(${MAP_COLS}, 1fr)`;
+        mapGridContainer.style.gridTemplateRows = `repeat(${MAP_ROWS}, 1fr)`;
+
+        for (let r = 0; r < MAP_ROWS; r++) {
+            for (let c = 0; c < MAP_COLS; c++) {
+                const cell = document.createElement('div');
+                cell.classList.add('map-cell');
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+
+                if (mapData && mapData[r] && mapData[r][c] === 1) { // Check mapData state
+                    cell.classList.add('discovered');
+                }
+                mapGridContainer.appendChild(cell);
+            }
+        }
+        // console.log("Map rendered.");
+    }
+    // --- End Map Functions ---
 
     // --- Central UI Visibility Management ---
     function updateUIVisibility() {
@@ -183,8 +225,8 @@ function initializeAppLogic() {
         if (ancientCoinsCountSpan) ancientCoinsCountSpan.textContent = ancientCoinsCount;
         else console.error("ancientCoinsCountSpan not found");
         if (premiumMapStatusSpan) {
-            premiumMapStatusSpan.textContent = hasPremiumMap ? "Active! Next explore is special." : "None";
-            premiumMapStatusSpan.style.color = hasPremiumMap ? '#27AE60' : 'inherit';
+            premiumMapStatusSpan.textContent = hasPremiumMap ? "Acquired" : "Not Owned";
+            premiumMapStatusSpan.style.color = hasPremiumMap ? 'green' : 'grey';
         } else console.error("premiumMapStatusSpan not found");
         if (blueprintFragmentsCountSpan) blueprintFragmentsCountSpan.textContent = blueprintFragmentsCount;
         else console.error("blueprintFragmentsCountSpan not found");
@@ -256,51 +298,92 @@ function initializeAppLogic() {
     }
 
     exploreButton.addEventListener('click', () => {
+        console.log("Explore button clicked");
         if (luckyHayBales < EXPLORE_COST_LHB) {
             showTemporaryMessage(exploreMessageP, `${currentDonkeyName} needs more LHB for an adventure!`, 3000, true);
             if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             return;
         }
         luckyHayBales -= EXPLORE_COST_LHB;
+
+        // --- Map Exploration Part --- 
+        let mapUpdateMsg = "";
+        let undiscoveredCells = [];
+        if (mapData && mapData.length === MAP_ROWS) { // Ensure mapData is initialized
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    if (mapData[r][c] === 0) {
+                        undiscoveredCells.push({ r, c });
+                    }
+                }
+            }
+        } else {
+             console.error("Explore clicked but mapData is not ready!");
+             initializeMap(); // Attempt to fix it
+             // Re-calculate undiscovered cells after fixing (optional, maybe just skip reveal this time)
+             mapUpdateMsg = "Map data needed refresh.";
+        }
+
+        if (undiscoveredCells.length > 0) {
+            const randomIndex = Math.floor(Math.random() * undiscoveredCells.length);
+            const cellToReveal = undiscoveredCells[randomIndex];
+            mapData[cellToReveal.r][cellToReveal.c] = 1; // Mark discovered
+            renderMap(); // Update map visually
+            mapUpdateMsg = `Discovered a new area at (${cellToReveal.c + 1}, ${cellToReveal.r + 1})!`;
+            if (mapMessage) { // Check element exists
+                mapMessage.textContent = mapUpdateMsg;
+                mapMessage.className = 'message-area success';
+            } else { console.warn("mapMessage element not found for update."); }
+        } else if (!mapUpdateMsg) { // Avoid overwriting refresh message
+            mapUpdateMsg = "The entire map is already explored!";
+            if (mapMessage) {
+                mapMessage.textContent = mapUpdateMsg;
+                mapMessage.className = 'message-area info';
+            }
+        }
+        // Clear map message after a delay?
+        // setTimeout(() => { if(mapMessage) mapMessage.textContent = ''; }, 5000);
+        // --- End Map Exploration Part ---
+
+        // Existing reward calculation logic...
         let foundLHB = 0;
         let foundGeode = false;
         let foundPebbles = 0;
         let foundAncientCoin = false;
         let outcomeMessage = "";
 
-        if (hasPremiumMap) {
-            foundGeode = true;
-            hasPremiumMap = false; 
-            foundLHB = Math.floor(Math.random() * 5) + 3; // 3-7 LHB with map
-            luckyHayBales += foundLHB;
-            outcomeMessage = `✨ Using the Premium Map, ${currentDonkeyName} unerringly led you to a Mystery Geode and ${foundLHB} LHB!`;
-            showTemporaryMessage(exploreMessageP, outcomeMessage, 4000);
-        } else {
-            const roll = Math.random();
-            if (roll < 0.01) { // 1% nothing
-                foundLHB = Math.floor(Math.random()*2)+1; // 1-2 LHB consolation
-                luckyHayBales += foundLHB;
-                outcomeMessage = `${currentDonkeyName} got distracted by a pretty butterfly but still found ${foundLHB} LHB.`;
-            } else if (roll < 0.05) { // 4% Ancient Coin (total 5% rare tier)
-                foundAncientCoin = true;
-                ancientCoinsCount++;
-                outcomeMessage = `Incredible! ${currentDonkeyName} sniffed out a rare Ancient Coin! These look valuable...`;
-            } else if (roll < 0.20) { // 15% Shiny Pebbles (total 20% uncommon tier)
-                foundPebbles = Math.floor(Math.random() * 3) + 1;
-                shinyPebblesCount += foundPebbles;
-                outcomeMessage = `${currentDonkeyName} kicked up some dust and uncovered ${foundPebbles} Shiny Pebbles!`;
-            } else if (roll < 0.40) { // 20% Geode (total 40% good tier)
-                foundGeode = true;
-                mysteryGeodesCount++;
-                outcomeMessage = `Great Scott! ${currentDonkeyName}'s keen eyes spotted a Mystery Geode!`;
-            } else { // 60% Common LHB
-                foundLHB = Math.floor(Math.random() * 11) + 5; // 5-15 LHB
-                luckyHayBales += foundLHB;
-                outcomeMessage = `${currentDonkeyName} munched on some grass and found ${foundLHB} Lucky Hay Bales!`;
-            }
-            showTemporaryMessage(exploreMessageP, outcomeMessage, 3500);
+        if (hasPremiumMap && mapUpdateMsg.includes('Discovered')) { // Use premium map only if a new area was discovered
+            hasPremiumMap = false; // Consume the map
+            // TODO: Optionally give a better reward or reveal more map cells here?
+            // For now, just consuming it.
+            outcomeMessage = `✨ Used the Premium Map while exploring!`;
+             // Update premium map status display
+             if(premiumMapStatusSpan) premiumMapStatusSpan.textContent = 'Not Owned'; premiumMapStatusSpan.style.color = 'grey';
         }
-        updateAllDisplays();
+        
+        // Continue with standard random rewards (or adjust based on premium map use)
+        const roll = Math.random();
+        if (roll < 0.01) { 
+            foundLHB = Math.floor(Math.random()*2)+1; luckyHayBales += foundLHB;
+            outcomeMessage += ` ${currentDonkeyName} got distracted but still found ${foundLHB} LHB.`;
+        } else if (roll < 0.05) { 
+            foundAncientCoin = true; ancientCoinsCount++;
+            outcomeMessage += ` Incredible! ${currentDonkeyName} sniffed out an Ancient Coin!`;
+        } else if (roll < 0.20) { 
+            foundPebbles = Math.floor(Math.random() * 3) + 1; shinyPebblesCount += foundPebbles;
+            outcomeMessage += ` ${currentDonkeyName} uncovered ${foundPebbles} Shiny Pebbles!`;
+        } else if (roll < 0.40) { 
+            foundGeode = true; mysteryGeodesCount++;
+            outcomeMessage += ` Great Scott! ${currentDonkeyName} spotted a Mystery Geode!`;
+        } else { 
+            foundLHB = Math.floor(Math.random() * 11) + 5; luckyHayBales += foundLHB;
+            outcomeMessage += ` ${currentDonkeyName} munched on grass and found ${foundLHB} LHB!`;
+        }
+
+        showTemporaryMessage(exploreMessageP, outcomeMessage.trim(), 3500); // Show item/LHB rewards in Action tab
+
+        updateAllDisplays(); // Update numerical displays
+        saveGameState(); // Save after exploration changes state
         if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
     });
 
@@ -534,7 +617,7 @@ function initializeAppLogic() {
         console.error("[IntroDebugCRITICAL] confirmDonkeyNameButton not found!");
     }
 
-    function initializeView() { // Was checkIntroStatus
+    function initializeView() {
         console.log("[ViewInit] Initializing view state.");
         const hasDoneIntro = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY) === 'true';
         const savedName = localStorage.getItem(LOCAL_STORAGE_DONKEY_NAME_KEY);
@@ -563,6 +646,12 @@ function initializeAppLogic() {
         }
         // All UI showing/hiding is now handled by updateUIVisibility
         updateUIVisibility();
+
+        // Now load all game state here before initializing map/view
+        loadGameState(); // Load LHB, items, AND map data
+        
+        // Initialize map using potentially loaded data
+        initializeMap(); 
     }
 
     disconnectButton.addEventListener('click', async () => {
@@ -573,8 +662,293 @@ function initializeAppLogic() {
         }
     });
 
-    initializeView(); // This will show intro or connect area via updateUIVisibility
-    showTab('actions-tab-content'); // Show the Actions tab by default when the game loads (if not in intro)
-    updateAllDisplays(); // Initial UI setup for default values
+    initializeView(); // Sets up intro/connect/game visibility and loads game state/map
+    renderMap();     // Render the map based on initial/loaded state after view is initialized
+    updateAllDisplays(); // Update all text displays based on loaded state
+    showTab('actions-tab-content'); // Set default tab after everything is loaded and rendered
 }
+
+// Make map functions accessible outside initializeAppLogic if needed, 
+// otherwise define them inside or pass necessary variables.
+// For simplicity, define them outside for now, assuming mapData and constants are accessible.
+
+// Need to declare mapData outside initializeAppLogic or pass it around.
+// Let's keep mapData declared inside initializeAppLogic for now and pass it where needed,
+// or make map functions inner functions of initializeAppLogic.
+
+// Decision: Make map functions inner functions of initializeAppLogic for easier access to state and UI elements.
+
+function initializeUI() {
+    // Assign elements to the declared variables
+    connectWalletButton = document.getElementById('ton-connect-button-root');
+    walletInfoDiv = document.getElementById('wallet-info');
+    disconnectButton = document.getElementById('disconnect-button');
+    gameContainerDiv = document.getElementById('game-container');
+    actionsTabContent = document.getElementById('actions-tab-content');
+    shopTabContent = document.getElementById('shop-tab-content');
+    inventoryTabContent = document.getElementById('inventory-tab-content');
+    mapTabContent = document.getElementById('map-tab-content');
+    mapGridContainer = document.getElementById('map-grid-container');
+    mapMessage = document.getElementById('map-message');
+
+    spendInput = document.getElementById('spend-amount');
+    spendButton = document.getElementById('spend-button');
+    spendMessage = document.getElementById('spend-message');
+    exploreButton = document.getElementById('explore-button');
+    exploreMessage = document.getElementById('explore-message');
+
+    tonkeyBalanceSpan = document.getElementById('tonkey-balance');
+    lhbBalanceSpan = document.getElementById('lhb-balance');
+    carrotCountSpan = document.getElementById('carrot-count');
+    stickCountSpan = document.getElementById('stick-count');
+    premiumMapStatusSpan = document.getElementById('premium-map-status');
+
+    buyPremiumMapButton = document.getElementById('buy-premium-map-button');
+    shopMessage = document.getElementById('shop-message');
+    inventoryMessage = document.getElementById('inventory-message');
+
+    // Tab related elements
+    tabButtons = document.querySelectorAll('.tab-button');
+    tabPanels = document.querySelectorAll('.tab-panel');
+
+    // Event Listeners
+    if (disconnectButton) {
+        disconnectButton.addEventListener('click', disconnectWallet);
+    } else {
+        console.error("Disconnect button not found during initialization.");
+    }
+    if (spendButton) {
+        spendButton.addEventListener('click', initiateSpendTransaction);
+    } else {
+        console.error("Spend button not found during initialization.");
+    }
+    if (exploreButton) {
+        exploreButton.addEventListener('click', explore);
+    } else {
+        console.error("Explore button not found during initialization.");
+    }
+    if (buyPremiumMapButton) {
+        buyPremiumMapButton.addEventListener('click', buyPremiumMap);
+    } else {
+        console.error("Buy Premium Map button not found during initialization.");
+    }
+
+    setupTabs();
+
+    // Show default tab (actions)
+    showTab('actions-tab-content');
+}
+
+function setupTabs() {
+    // ... existing code ...
+}
+
+// --- Game Actions ---
+
+function explore() {
+    if (!currentWalletInfo) {
+        exploreMessage.textContent = "Connect your wallet to explore!";
+        exploreMessage.className = 'message-area error';
+        return;
+    }
+    console.log("Explore action triggered. LHB:", lhbBalance, "Carrots:", carrotCount, "Sticks:", stickCount);
+    if (lhbBalance < 1 && carrotCount < 1 && stickCount < 1) {
+        exploreMessage.textContent = "You need at least 1 LHB, Carrot, or Stick to explore!";
+        exploreMessage.className = 'message-area error';
+        return;
+    }
+
+    let costMsg = "";
+    if (lhbBalance >= 1) {
+        lhbBalance -= 1;
+        costMsg = "Used 1 LHB.";
+    } else if (carrotCount >= 1) {
+        carrotCount -= 1;
+        costMsg = "Used 1 Carrot.";
+    } else if (stickCount >= 1) {
+        stickCount -= 1;
+        costMsg = "Used 1 Stick.";
+    }
+
+    let undiscoveredCells = [];
+    if (mapData && mapData.length === MAP_ROWS) { // Ensure mapData is initialized
+        for (let r = 0; r < MAP_ROWS; r++) {
+            for (let c = 0; c < MAP_COLS; c++) {
+                if (mapData[r][c] === 0) {
+                    undiscoveredCells.push({ r, c });
+                }
+            }
+        }
+    } else {
+        exploreMessage.textContent = "Map data not ready. Please wait or refresh.";
+        exploreMessage.className = 'message-area error';
+        initializeMap(); // Attempt to re-initialize if map data is missing
+        renderMap();
+        return;
+    }
+
+
+    let mapUpdateMsg = "";
+    if (undiscoveredCells.length > 0) {
+        const randomIndex = Math.floor(Math.random() * undiscoveredCells.length);
+        const cellToReveal = undiscoveredCells[randomIndex];
+        mapData[cellToReveal.r][cellToReveal.c] = 1;
+        renderMap();
+        mapUpdateMsg = `Discovered a new area at (${cellToReveal.c + 1}, ${cellToReveal.r + 1})!`;
+        if(mapMessage) { // Check if mapMessage element exists
+             mapMessage.textContent = mapUpdateMsg;
+             mapMessage.className = 'message-area success';
+        }
+        console.log(mapUpdateMsg);
+    } else {
+        mapUpdateMsg = "The entire map is already explored!";
+        if(mapMessage) {
+            mapMessage.textContent = mapUpdateMsg;
+            mapMessage.className = 'message-area info';
+        }
+    }
+
+    let rewardMsg = "";
+    const reward = Math.floor(Math.random() * (LHB_REWARD_MAX - LHB_REWARD_MIN + 1)) + LHB_REWARD_MIN;
+    lhbBalance += reward;
+    rewardMsg = `Found ${reward} Lucky Hay Bales (LHB)!`;
+
+    let itemFoundMsg = "";
+    if (Math.random() < ITEM_FIND_CHANCE) {
+        const items = ['Carrot', 'Stick'];
+        const foundItem = items[Math.floor(Math.random() * items.length)];
+        if (foundItem === 'Carrot') {
+            carrotCount++;
+            itemFoundMsg = "Found a juicy Carrot!";
+        } else {
+            stickCount++;
+            itemFoundMsg = "Found a sturdy Stick!";
+        }
+    }
+
+    exploreMessage.textContent = `${costMsg} ${rewardMsg} ${itemFoundMsg}`.trim();
+    exploreMessage.className = 'message-area success';
+    updateAllDisplays();
+    saveGameState();
+}
+
+function buyPremiumMap() {
+    if (!currentWalletInfo) {
+        shopMessage.textContent = "Connect your wallet first!";
+        shopMessage.className = 'message-area error';
+        return;
+    }
+    if (hasPremiumMap) {
+        shopMessage.textContent = "You already own the Premium Map.";
+        shopMessage.className = 'message-area info';
+        return;
+    }
+    if (lhbBalance < PREMIUM_MAP_COST) {
+        shopMessage.textContent = `Not enough LHB. You need ${PREMIUM_MAP_COST}.`;
+        shopMessage.className = 'message-area error';
+        return;
+    }
+
+    lhbBalance -= PREMIUM_MAP_COST;
+    hasPremiumMap = true;
+    // premiumMapStatusSpan, buyPremiumMapButton, shopMessage will be updated in updateAllDisplays
+    shopMessage.textContent = "Successfully bought the Premium Map! It might reveal more when exploring.";
+    shopMessage.className = 'message-area success';
+    updateAllDisplays();
+    saveGameState();
+}
+
+// --- Blockchain Interaction (TonConnect & ton.js) ---
+// ... existing code ...
+
+// --- UI Update Functions ---
+
+function updateWalletInfo(walletInfo) {
+// ... existing code ...
+}
+
+function updateUIForConnectionState(isConnected) {
+// ... existing code ...
+}
+
+function updateAllDisplays() {
+    // Ensure elements are available before trying to update them
+    if (!tonkeyBalanceSpan || !lhbBalanceSpan || !carrotCountSpan || !stickCountSpan || 
+        !premiumMapStatusSpan || !buyPremiumMapButton || !spendInput || !spendButton || !exploreButton) {
+        // console.warn("UI elements not ready for updateAllDisplays. DOM might not be fully initialized.");
+        return;
+    }
+
+    tonkeyBalanceSpan.textContent = currentTonkeyBalance !== null ? `${currentTonkeyBalance} TKY` : 'Loading...';
+    lhbBalanceSpan.textContent = lhbBalance;
+    carrotCountSpan.textContent = carrotCount;
+    stickCountSpan.textContent = stickCount;
+
+    premiumMapStatusSpan.textContent = hasPremiumMap ? 'Acquired' : 'Not Owned';
+    premiumMapStatusSpan.style.color = hasPremiumMap ? 'green' : 'grey';
+    buyPremiumMapButton.disabled = hasPremiumMap || luckyHayBales < PREMIUM_MAP_COST;
+
+    // Input States
+    const interactable = !!userWalletAddress; // Can interact if wallet is connected
+    spendInput.disabled = !interactable;
+    spendButton.disabled = !interactable;
+    exploreButton.disabled = !interactable;
+
+    // Render map (Only if needed, usually handled by explore action)
+    // renderMap();
+}
+
+function loadGameState() {
+    console.log("Loading game state...");
+    luckyHayBales = parseInt(localStorage.getItem('lhbBalance') || '50');
+    mysteryGeodesCount = parseInt(localStorage.getItem('mysteryGeodesCount') || '0');
+    shinyPebblesCount = parseInt(localStorage.getItem('shinyPebblesCount') || '0');
+    ancientCoinsCount = parseInt(localStorage.getItem('ancientCoinsCount') || '0');
+    hasPremiumMap = localStorage.getItem('hasPremiumMap') === 'true';
+    blueprintFragmentsCount = parseInt(localStorage.getItem('blueprintFragmentsCount') || '0');
+    
+    const savedMapDataString = localStorage.getItem('mapData');
+    if (savedMapDataString) {
+        try {
+            const parsedMapData = JSON.parse(savedMapDataString);
+            // Validate structure and dimensions
+            if (Array.isArray(parsedMapData) && parsedMapData.length === MAP_ROWS &&
+                parsedMapData.every(row => Array.isArray(row) && row.length === MAP_COLS)) {
+                mapData = parsedMapData;
+                console.log("Map data loaded successfully.");
+            } else {
+                console.warn("Saved map data has incorrect dimensions/structure. Resetting map.");
+                initializeMap(); // Will create a fresh map
+            }
+        } catch (e) {
+            console.error("Failed to parse map data. Resetting map.", e);
+            initializeMap(); // Will create a fresh map
+        }
+    } else {
+        console.log("No saved map data found. Initializing new map.");
+        initializeMap(); // Will create a fresh map
+    }
+}
+
+function saveGameState() {
+    console.log("Saving game state...");
+    localStorage.setItem('lhbBalance', luckyHayBales.toString());
+    localStorage.setItem('mysteryGeodesCount', mysteryGeodesCount.toString());
+    localStorage.setItem('shinyPebblesCount', shinyPebblesCount.toString());
+    localStorage.setItem('ancientCoinsCount', ancientCoinsCount.toString());
+    localStorage.setItem('hasPremiumMap', hasPremiumMap.toString());
+    localStorage.setItem('blueprintFragmentsCount', blueprintFragmentsCount.toString());
+    
+    // Save map state if it's valid
+    if (mapData && mapData.length === MAP_ROWS) {
+        localStorage.setItem('mapData', JSON.stringify(mapData));
+        console.log("Map data saved.");
+    } else {
+         console.warn("Attempted to save invalid map data. Skipping map save.");
+    }
+}
+
+// --- Utility Functions ---
+// ... existing code ...
 // --------------- APP LOGIC ENDS HERE ----------------- 
+// Removed duplicate function definitions previously outside initializeAppLogic
