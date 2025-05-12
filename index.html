@@ -310,11 +310,43 @@
         
         <div id="map-tab-content" class="tab-panel hidden">
             <h2>Trail Map</h2>
-            <p>Guide your Tonkey to explore new areas!</p>
-            <div id="map-grid-container">
-                <!-- Map grid will be generated here by JavaScript -->
+            <p>Guide your Tonkey to explore new areas! Each expedition reveals a new piece of the map.</p>
+            
+            <div id="map-container-wrapper">
+                <div id="map-grid-container">
+                    <!-- Map grid will be generated here by JavaScript -->
+                </div>
             </div>
+            
+            <div id="map-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a5d6a7;"></div>
+                    <span>Grass</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #c5e1a5;"></div>
+                    <span>Hills</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #bcaaa4;"></div>
+                    <span>Mountains</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #90caf9;"></div>
+                    <span>Water</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #66bb6a;"></div>
+                    <span>Forest</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ffe082;"></div>
+                    <span>Desert</span>
+                </div>
+            </div>
+            
             <p id="map-message" class="message-area"></p>
+            <p class="map-tip">Use the "Go Exploring!" button in the Actions tab to discover more of the map. Premium Maps can reveal special areas!</p>
         </div>
 
         <button id="disconnect-button">Disconnect & Leave Trail</button>
