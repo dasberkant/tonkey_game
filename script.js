@@ -125,86 +125,67 @@ function initializeAppLogic() {
     // --- Map Functions ---
     function initializeMap() {
         console.log("[Map] Initializing map data");
-        // Only initialize if needed (not already loaded from localStorage)
-        if (!mapData || !Array.isArray(mapData) || mapData.length !== MAP_ROWS) {
-            mapData = [];
-            // Generate terrain data for all cells
-            for (let r = 0; r < MAP_ROWS; r++) {
-                mapData[r] = [];
-                for (let c = 0; c < MAP_COLS; c++) {
-                    // Cell format: { discovered: false, terrain: 'type', special: false }
-                    const terrainType = TERRAIN_TYPES[Math.floor(Math.random() * TERRAIN_TYPES.length)];
-                    const isSpecial = Math.random() < SPECIAL_LOCATION_CHANCE;
-                    mapData[r][c] = {
-                        discovered: false,
-                        terrain: terrainType,
-                        special: isSpecial
-                    };
-                }
-            }
-            
-            // Ensure starting position is available at center
-            const centerRow = Math.floor(MAP_ROWS / 2);
-            const centerCol = Math.floor(MAP_COLS / 2);
-            mapData[centerRow][centerCol].discovered = true; // Start with center revealed
-            mapData[centerRow][centerCol].terrain = 'grass'; // Start on grass
-            mapData[centerRow][centerCol].special = false; // No special at start
-            currentMapPosition = { row: centerRow, col: centerCol };
-            
-            console.log("[Map] New map initialized with center revealed");
-        } else {
-            console.log("[Map] Using existing map data");
-            // Find current position in existing map data
-            let foundPosition = false;
-            for (let r = 0; r < MAP_ROWS; r++) {
-                for (let c = 0; c < MAP_COLS; c++) {
-                    if (mapData[r][c].isCurrent) {
-                        currentMapPosition = { row: r, col: c };
-                        foundPosition = true;
-                        break;
-                    }
-                }
-                if (foundPosition) break;
-            }
-            
-            // If no current position found, use center or first discovered cell
-            if (!foundPosition) {
-                const centerRow = Math.floor(MAP_ROWS / 2);
-                const centerCol = Math.floor(MAP_COLS / 2);
+        
+        // Force creation of a new map data structure regardless of prior state
+        mapData = [];
+        
+        // Generate terrain data for all cells
+        for (let r = 0; r < MAP_ROWS; r++) {
+            mapData[r] = [];
+            for (let c = 0; c < MAP_COLS; c++) {
+                // Cell format: { discovered: false, terrain: 'type', special: false }
+                const terrainIndex = Math.floor(Math.random() * TERRAIN_TYPES.length);
+                const terrainType = TERRAIN_TYPES[terrainIndex];
+                const isSpecial = Math.random() < SPECIAL_LOCATION_CHANCE;
                 
-                if (mapData[centerRow][centerCol].discovered) {
-                    currentMapPosition = { row: centerRow, col: centerCol };
-                } else {
-                    // Find any discovered cell to use as current position
-                    for (let r = 0; r < MAP_ROWS; r++) {
-                        for (let c = 0; c < MAP_COLS; c++) {
-                            if (mapData[r][c].discovered) {
-                                currentMapPosition = { row: r, col: c };
-                                foundPosition = true;
-                                break;
-                            }
-                        }
-                        if (foundPosition) break;
-                    }
-                    
-                    // If still no position, use center anyway
-                    if (!foundPosition) {
-                        currentMapPosition = { row: centerRow, col: centerCol };
-                        mapData[centerRow][centerCol].discovered = true;
-                    }
-                }
+                mapData[r][c] = {
+                    discovered: false,
+                    terrain: terrainType,
+                    special: isSpecial,
+                    isCurrent: false
+                };
             }
         }
-        renderMap(); // Render the map after initialization
+        
+        // Ensure starting position is available at center
+        const centerRow = Math.floor(MAP_ROWS / 2);
+        const centerCol = Math.floor(MAP_COLS / 2);
+        
+        // Set the center cell as discovered and make it the current position
+        mapData[centerRow][centerCol].discovered = true;
+        mapData[centerRow][centerCol].terrain = 'grass'; // Start on grass
+        mapData[centerRow][centerCol].special = false; // No special at start
+        mapData[centerRow][centerCol].isCurrent = true;
+        currentMapPosition = { row: centerRow, col: centerCol };
+        
+        console.log("[Map] New map initialized with center revealed at:", currentMapPosition);
+        console.log("[Map] First few cells:", mapData[0][0], mapData[0][1], mapData[centerRow][centerCol]);
+        
+        // Explicitly call renderMap after initialization
+        renderMap();
     }
 
     function renderMap() {
+        console.log("[Map] renderMap called");
+        
+        // Check if we're in the initializeAppLogic scope
         const mapContainer = document.getElementById('map-grid-container');
         if (!mapContainer) {
-            console.error("[Map] Map container not found!");
+            console.error("[Map] Map container #map-grid-container not found in DOM!");
             return;
         }
         
+        // Check if mapData is properly initialized
+        if (!mapData || !Array.isArray(mapData) || mapData.length === 0) {
+            console.error("[Map] mapData is not properly initialized:", mapData);
+            initializeMap(); // Try to initialize the map
+            if (!mapData || !Array.isArray(mapData) || mapData.length === 0) {
+                console.error("[Map] Failed to initialize mapData even after calling initializeMap()");
+                return; // Still failed, give up
+            }
+        }
+        
+        console.log("[Map] Clearing map container and setting up grid");
         // Clear existing content
         mapContainer.innerHTML = '';
         
@@ -213,12 +194,19 @@ function initializeAppLogic() {
         mapContainer.style.gridTemplateRows = `repeat(${MAP_ROWS}, 1fr)`;
         
         // Create cells
+        console.log("[Map] Creating map cells");
         for (let r = 0; r < MAP_ROWS; r++) {
             for (let c = 0; c < MAP_COLS; c++) {
                 const cell = document.createElement('div');
                 cell.classList.add('map-cell');
                 cell.dataset.row = r;
                 cell.dataset.col = c;
+                
+                // Safety check - make sure mapData[r][c] exists
+                if (!mapData[r] || !mapData[r][c]) {
+                    console.error(`[Map] mapData[${r}][${c}] is undefined!`);
+                    continue;
+                }
                 
                 // Apply appropriate classes based on cell data
                 if (mapData[r][c].discovered) {
@@ -241,6 +229,11 @@ function initializeAppLogic() {
                 mapContainer.appendChild(cell);
             }
         }
+        
+        console.log("[Map] Map rendering complete");
+        
+        // Force a layout reflow to ensure the grid is visible
+        void mapContainer.offsetHeight;
     }
     
     function handleMapCellClick(row, col) {
@@ -387,6 +380,15 @@ function initializeAppLogic() {
     // --- Tab Navigation Logic ---
     function showTab(tabIdToShow) {
         console.log("[Tabs] Attempting to show tab:", tabIdToShow);
+        
+        // Add special handling for map tab
+        if (tabIdToShow === 'map-tab-content') {
+            console.log("[Map] Map tab selected, forcing map render");
+            setTimeout(() => {
+                renderMap(); // Re-render the map when the tab is shown
+            }, 100); // Small delay to ensure the tab is visible first
+        }
+        
         tabPanels.forEach(panel => {
             if (panel) {
                 panel.classList.add('hidden');
@@ -394,6 +396,7 @@ function initializeAppLogic() {
                 console.error("[Tabs] A tab panel element is null.");
             }
         });
+        
         const panelToShow = document.getElementById(tabIdToShow);
         if (panelToShow) {
             panelToShow.classList.remove('hidden');
@@ -584,9 +587,37 @@ function initializeAppLogic() {
     });
 
     initializeView(); // Sets up intro/connect/game visibility and loads game state/map
+    initializeMap(); // Ensure map is initialized
     renderMap();     // Render the map based on initial/loaded state after view is initialized
     updateAllDisplays(); // Update all text displays based on loaded state
     showTab('actions-tab-content'); // Set default tab after everything is loaded and rendered
+    
+    // Add a debug button to the UI for direct map access
+    const debugContainer = document.createElement('div');
+    debugContainer.style.position = 'fixed';
+    debugContainer.style.bottom = '10px';
+    debugContainer.style.right = '10px';
+    debugContainer.style.zIndex = '9999';
+    
+    const debugButton = document.createElement('button');
+    debugButton.textContent = 'Debug Map';
+    debugButton.style.padding = '5px';
+    debugButton.style.fontSize = '12px';
+    debugButton.style.backgroundColor = '#ff6b6b';
+    debugButton.addEventListener('click', () => {
+        console.log("[Debug] Forcing map rendering...");
+        console.log("[Debug] Current map data:", mapData);
+        console.log("[Debug] Map container:", document.getElementById('map-grid-container'));
+        
+        showTab('map-tab-content');
+        setTimeout(() => {
+            initializeMap(); // Force reinitialize
+            renderMap(); // Force render
+        }, 100);
+    });
+    
+    debugContainer.appendChild(debugButton);
+    document.body.appendChild(debugContainer);
 }
 
 // Make map functions accessible outside initializeAppLogic if needed, 
