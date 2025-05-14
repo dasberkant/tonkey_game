@@ -95,26 +95,28 @@ function initializeAppLogic() {
     let currentDonkeyName = "Barnaby"; // Default
 
     // Player Game State
-    let luckyHayBales = 50;
+    let luckyHayBales = 50; // Start with some LHB
     let mysteryGeodesCount = 0;
     let shinyPebblesCount = 0;
     let ancientCoinsCount = 0;
     let hasPremiumMap = false;
-    let blueprintFragmentsCount = 0;
-    let mapData = []; // Will store map cell data
-    let currentMapPosition = { row: -1, col: -1 }; // Current position on map
+    let blueprintFragmentsCount = 0; // For future use
 
     const CHAIN = { MAINNET: '-239', TESTNET: '-3' };
 
-    // Map Constants
-    const MAP_ROWS = 10;
-    const MAP_COLS = 10;
-    const TERRAIN_TYPES = ['grass', 'hills', 'mountains', 'water', 'forest', 'desert'];
-    const SPECIAL_LOCATION_CHANCE = 0.15; // 15% chance for a cell to be a special location
-
-    // State Variables
-    const mapGridContainer = document.getElementById('map-grid-container');
-    const mapMessage = document.getElementById('map-message');
+    // --- Helper Functions (showAlertFallback, showConfirmFallback - Keep as is) ---
+    function showAlertFallback(message) {
+        if (tg && tg.showAlert && typeof tg.showAlert === 'function') {
+            try { tg.showAlert(message); } catch (e) { window.alert(message); }
+        } else { window.alert(message); }
+    }
+    async function showConfirmFallback(message) {
+        if (tg && tg.showConfirm && typeof tg.showConfirm === 'function') {
+            try { return await new Promise(resolve => { tg.showConfirm(message, (ok) => resolve(ok)); }); }
+            catch (e) { return window.confirm(message); }
+        } else { return window.confirm(message); }
+    }
+    // --- End Helper Functions ---
 
     const tonConnectUI = new TonConnectUI({
         manifestUrl: 'https://dasberkant.github.io/tonkey_game/tonconnect-manifest.json', // Ensure this is your GitHub Pages URL
@@ -122,183 +124,184 @@ function initializeAppLogic() {
         uiOptions: { twaReturnUrl: 'https://dasberkant.github.io/tonkey_game/' }
     });
 
-    // --- Map Functions ---
-    function initializeMap() {
-        console.log("[Map] Initializing map data");
+    // --- Central UI Visibility Management ---
+    function updateUIVisibility() {
+        const introDone = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY) === 'true';
+        const isConnected = tonConnectUI.connected; // Or check userWalletAddress if more direct
+
+        console.log(`[UIUpdate] Updating visibility. IntroDone: ${introDone}, IsConnected: ${isConnected}, CurrentStoryPart: ${currentStoryPart}`);
+
+        // Ensure all are potentially hidden first, then show the correct one.
+        if (introOverlay) introOverlay.classList.add('hidden');
+        else console.error("[UIUpdate] introOverlay is null!");
+
+        if (connectAreaDiv) connectAreaDiv.classList.add('hidden');
+        else console.error("[UIUpdate] connectAreaDiv is null!");
+
+        if (gameContainerDiv) gameContainerDiv.classList.add('hidden');
+        else console.error("[UIUpdate] gameContainerDiv is null!");
         
-        // Force creation of a new map data structure regardless of prior state
-        mapData = [];
-        
-        // Generate terrain data for all cells
-        for (let r = 0; r < MAP_ROWS; r++) {
-            mapData[r] = [];
-            for (let c = 0; c < MAP_COLS; c++) {
-                // Cell format: { discovered: false, terrain: 'type', special: false }
-                const terrainIndex = Math.floor(Math.random() * TERRAIN_TYPES.length);
-                const terrainType = TERRAIN_TYPES[terrainIndex];
-                const isSpecial = Math.random() < SPECIAL_LOCATION_CHANCE;
-                
-                mapData[r][c] = {
-                    discovered: false,
-                    terrain: terrainType,
-                    special: isSpecial,
-                    isCurrent: false
-                };
+        // Naming page is part of intro sequence, managed by showStoryPart, but ensure it's hidden if introOverlay is hidden.
+        if (donkeyNamingPage && introDone) donkeyNamingPage.classList.add('hidden');
+
+
+        if (!introDone) {
+            console.log("[UIUpdate] Showing intro sequence.");
+            if (introOverlay) {
+                introOverlay.classList.remove('hidden');
+                // showStoryPart will manage children of introOverlay (story parts, naming page)
+                showStoryPart(currentStoryPart); // Ensure currentStoryPart is correctly set
             }
+        } else if (!isConnected) {
+            console.log("[UIUpdate] Intro done, not connected. Showing connect area.");
+            if (connectAreaDiv) connectAreaDiv.classList.remove('hidden');
+        } else { // Intro done AND connected
+            console.log("[UIUpdate] Intro done, connected. Showing game container.");
+            if (gameContainerDiv) gameContainerDiv.classList.remove('hidden');
         }
-        
-        // Ensure starting position is available at center
-        const centerRow = Math.floor(MAP_ROWS / 2);
-        const centerCol = Math.floor(MAP_COLS / 2);
-        
-        // Set the center cell as discovered and make it the current position
-        mapData[centerRow][centerCol].discovered = true;
-        mapData[centerRow][centerCol].terrain = 'grass'; // Start on grass
-        mapData[centerRow][centerCol].special = false; // No special at start
-        mapData[centerRow][centerCol].isCurrent = true;
-        currentMapPosition = { row: centerRow, col: centerCol };
-        
-        console.log("[Map] New map initialized with center revealed at:", currentMapPosition);
-        console.log("[Map] First few cells:", mapData[0][0], mapData[0][1], mapData[centerRow][centerCol]);
-        
-        // Explicitly call renderMap after initialization
-        renderMap();
     }
 
-    function renderMap() {
-        console.log("[Map] renderMap called");
+    // --- UI Update Functions ---
+    function updateAllDisplays() {
+        // Update persistent top-right balances
+        // The line that was here trying to set topTonkeyBalanceSpan.textContent has been removed.
+        // topTonkeyBalanceSpan is updated by fetchAndDisplayTonkeyBalance() or by onStatusChange() upon disconnect.
         
-        // Check if we're in the initializeAppLogic scope
-        const mapContainer = document.getElementById('map-grid-container');
-        if (!mapContainer) {
-            console.error("[Map] Map container #map-grid-container not found in DOM!");
-            return;
-        }
+        if (topLhbBalanceSpan) topLhbBalanceSpan.textContent = luckyHayBales;
+        else console.error("topLhbBalanceSpan not found");
+
+        // Update balances in the Inventory Tab
+        // Note: tonkeyBalanceGameSpan (the variable for an element with id 'tonkey-balance-game') is null 
+        // because the HTML element was removed. So, no update needed for it here.
+        if (lhbBalanceSpan) lhbBalanceSpan.textContent = luckyHayBales;
+        else console.error("lhbBalanceSpan (inventory tab) not found");
+
+        if (geodesCountSpan) geodesCountSpan.textContent = mysteryGeodesCount;
+        else console.error("geodesCountSpan not found");
+        if (pebblesCountSpan) pebblesCountSpan.textContent = shinyPebblesCount;
+        else console.error("pebblesCountSpan not found");
+        if (ancientCoinsCountSpan) ancientCoinsCountSpan.textContent = ancientCoinsCount;
+        else console.error("ancientCoinsCountSpan not found");
+        if (premiumMapStatusSpan) {
+            premiumMapStatusSpan.textContent = hasPremiumMap ? "Active! Next explore is special." : "None";
+            premiumMapStatusSpan.style.color = hasPremiumMap ? '#27AE60' : 'inherit';
+        } else console.error("premiumMapStatusSpan not found");
+        if (blueprintFragmentsCountSpan) blueprintFragmentsCountSpan.textContent = blueprintFragmentsCount;
+        else console.error("blueprintFragmentsCountSpan not found");
         
-        // Check if mapData is properly initialized
-        if (!mapData || !Array.isArray(mapData) || mapData.length === 0) {
-            console.error("[Map] mapData is not properly initialized:", mapData);
-            initializeMap(); // Try to initialize the map
-            if (!mapData || !Array.isArray(mapData) || mapData.length === 0) {
-                console.error("[Map] Failed to initialize mapData even after calling initializeMap()");
-                return; // Still failed, give up
-            }
-        }
+        if (crackGeodeButton) crackGeodeButton.disabled = mysteryGeodesCount === 0;
+        else console.error("crackGeodeButton not found");
+        if (exploreButton) exploreButton.textContent = `Go Exploring! (-${EXPLORE_COST_LHB} LHB)`;
+        else console.error("exploreButton not found");
         
-        console.log("[Map] Clearing map container and setting up grid");
-        // Clear existing content
-        mapContainer.innerHTML = '';
-        
-        // Set grid dimensions
-        mapContainer.style.gridTemplateColumns = `repeat(${MAP_COLS}, 1fr)`;
-        mapContainer.style.gridTemplateRows = `repeat(${MAP_ROWS}, 1fr)`;
-        
-        // Create cells
-        console.log("[Map] Creating map cells");
-        for (let r = 0; r < MAP_ROWS; r++) {
-            for (let c = 0; c < MAP_COLS; c++) {
-                const cell = document.createElement('div');
-                cell.classList.add('map-cell');
-                cell.dataset.row = r;
-                cell.dataset.col = c;
-                
-                // Safety check - make sure mapData[r][c] exists
-                if (!mapData[r] || !mapData[r][c]) {
-                    console.error(`[Map] mapData[${r}][${c}] is undefined!`);
-                    continue;
-                }
-                
-                // Apply appropriate classes based on cell data
-                if (mapData[r][c].discovered) {
-                    cell.classList.add('discovered');
-                    cell.classList.add(`terrain-${mapData[r][c].terrain}`);
-                    
-                    if (mapData[r][c].special) {
-                        cell.classList.add('special-location');
-                    }
-                    
-                    // Mark current position
-                    if (r === currentMapPosition.row && c === currentMapPosition.col) {
-                        cell.classList.add('current-location');
-                    }
-                }
-                
-                // Add click listener to show cell info
-                cell.addEventListener('click', () => handleMapCellClick(r, c));
-                
-                mapContainer.appendChild(cell);
-            }
-        }
-        
-        console.log("[Map] Map rendering complete");
-        
-        // Force a layout reflow to ensure the grid is visible
-        void mapContainer.offsetHeight;
-    }
-    
-    function handleMapCellClick(row, col) {
-        // Only handle clicks on discovered cells
-        if (!mapData[row][col].discovered) {
-            showTemporaryMessage(mapMessage, "This area hasn't been explored yet! Use the Explore button to discover new areas.", 3000);
-            return;
-        }
-        
-        // Clear any current cell
-        if (currentMapPosition.row !== -1 && currentMapPosition.col !== -1) {
-            mapData[currentMapPosition.row][currentMapPosition.col].isCurrent = false;
-        }
-        
-        // Set new current position
-        currentMapPosition = { row, col };
-        mapData[row][col].isCurrent = true;
-        
-        // Get terrain info
-        const terrainType = mapData[row][col].terrain;
-        let terrainDescription = "";
-        
-        switch(terrainType) {
-            case 'grass':
-                terrainDescription = "Lush grassy plains stretch out before you. Perfect for grazing!";
-                break;
-            case 'hills':
-                terrainDescription = "Rolling hills with a nice view. A bit of a climb for Tonkey!";
-                break;
-            case 'mountains':
-                terrainDescription = "Majestic mountains tower overhead. The air is thin up here!";
-                break;
-            case 'water':
-                terrainDescription = "A sparkling body of water. Tonkey isn't keen on swimming!";
-                break;
-            case 'forest':
-                terrainDescription = "Dense forests with dappled sunlight. Watch for forest critters!";
-                break;
-            case 'desert':
-                terrainDescription = "Arid desert sands. Tonkey's hooves sink slightly with each step.";
-                break;
-            default:
-                terrainDescription = "An interesting area to explore.";
-        }
-        
-        // Add special location info if applicable
-        if (mapData[row][col].special) {
-            terrainDescription += " There's something special about this place...";
-        }
-        
-        // Display the information
-        if (mapMessage) {
-            mapMessage.textContent = terrainDescription;
-            mapMessage.className = 'message-area';
-        }
-        
-        // Re-render map to show new current position
-        renderMap();
-        saveGameState();
+        if (donkeyNameP) donkeyNameP.textContent = currentDonkeyName; // Update donkey name display
+        else console.error("donkeyNameP not found");
     }
 
-    // --- Modify explore button to update map ---
+    // --- TON Blockchain Interaction Functions (getTonClient, getJettonWalletAddress, getJettonBalance - Keep largely as is) ---
+    function getTonClient(networkChainId) {
+        if (networkChainId === CHAIN.MAINNET) return new TonClient({ endpoint: 'https://toncenter.com/api/v2/jsonRPC' });
+        return new TonClient({ endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC' });
+    }
+    async function getJettonWalletAddress(ownerAddressStr, jettonMasterAddrStr) {
+        if (!tonClient) return null;
+        try {
+            const result = await tonClient.runMethod(Address.parse(jettonMasterAddrStr), 'get_wallet_address', [{ type: 'slice', cell: beginCell().storeAddress(Address.parse(ownerAddressStr)).endCell() }]);
+            return result.stack.readAddress().toString();
+        } catch (error) { console.error('Error getting Jetton wallet address:', error); return null; }
+    }
+    async function getJettonBalance(jettonWalletAddrStr) {
+        if (!tonClient || !jettonWalletAddrStr) return 'Error';
+        try {
+            const result = await tonClient.runMethod(Address.parse(jettonWalletAddrStr), 'get_wallet_data');
+            return parseFloat(fromNano(result.stack.readBigNumber())).toFixed(2);
+        } catch (error) {
+            console.error('Error getting Jetton balance:', error);
+            if (error.message && (error.message.includes('exit_code: -13') || error.message.includes('method not found'))) return '0.00';
+            return 'Error';
+        }
+    }
+    async function fetchAndDisplayTonkeyBalance() {
+        if (!userWalletAddress || !tonClient) { 
+            if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = 'N/A'; 
+            // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = 'N/A'; // If it still exists
+            return; 
+        }
+        if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = '...'; // Fetching indicator for top display
+        // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = '...'; // Fetching indicator for tab display if it exists
+
+        userTonkeyWalletAddress = await getJettonWalletAddress(userWalletAddress, tonkeyMasterAddress);
+        if (userTonkeyWalletAddress) {
+            const balance = await getJettonBalance(userTonkeyWalletAddress);
+            if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = balance;
+            // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = balance; // If it still exists
+        } else {
+            if (topTonkeyBalanceSpan) topTonkeyBalanceSpan.textContent = '0.00';
+            // if (tonkeyBalanceGameSpan) tonkeyBalanceGameSpan.textContent = '0.00 (No Jetton Wallet)'; // If it still exists
+        }
+    }
+    // --- End TON Blockchain Interaction ---
+
+    // --- Game Logic Functions ---
+    function showTemporaryMessage(element, message, duration = 3000, isError = false) {
+        element.textContent = message;
+        element.classList.toggle('error-message', isError);
+        void element.offsetWidth; // trigger reflow to restart animation
+        element.classList.add('itemPop'); // Add animation class
+        setTimeout(() => {
+            element.textContent = '';
+            element.classList.remove('error-message', isError);
+            element.classList.remove('itemPop');
+        }, duration);
+    }
+
     exploreButton.addEventListener('click', () => {
-        // Instead of duplicating all the logic here, simply call the explore function
-        explore();
+        if (luckyHayBales < EXPLORE_COST_LHB) {
+            showTemporaryMessage(exploreMessageP, `${currentDonkeyName} needs more LHB for an adventure!`, 3000, true);
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+            return;
+        }
+        luckyHayBales -= EXPLORE_COST_LHB;
+        let foundLHB = 0;
+        let foundGeode = false;
+        let foundPebbles = 0;
+        let foundAncientCoin = false;
+        let outcomeMessage = "";
+
+        if (hasPremiumMap) {
+            foundGeode = true;
+            hasPremiumMap = false; 
+            foundLHB = Math.floor(Math.random() * 5) + 3; // 3-7 LHB with map
+            luckyHayBales += foundLHB;
+            outcomeMessage = `✨ Using the Premium Map, ${currentDonkeyName} unerringly led you to a Mystery Geode and ${foundLHB} LHB!`;
+            showTemporaryMessage(exploreMessageP, outcomeMessage, 4000);
+        } else {
+            const roll = Math.random();
+            if (roll < 0.01) { // 1% nothing
+                foundLHB = Math.floor(Math.random()*2)+1; // 1-2 LHB consolation
+                luckyHayBales += foundLHB;
+                outcomeMessage = `${currentDonkeyName} got distracted by a pretty butterfly but still found ${foundLHB} LHB.`;
+            } else if (roll < 0.05) { // 4% Ancient Coin (total 5% rare tier)
+                foundAncientCoin = true;
+                ancientCoinsCount++;
+                outcomeMessage = `Incredible! ${currentDonkeyName} sniffed out a rare Ancient Coin! These look valuable...`;
+            } else if (roll < 0.20) { // 15% Shiny Pebbles (total 20% uncommon tier)
+                foundPebbles = Math.floor(Math.random() * 3) + 1;
+                shinyPebblesCount += foundPebbles;
+                outcomeMessage = `${currentDonkeyName} kicked up some dust and uncovered ${foundPebbles} Shiny Pebbles!`;
+            } else if (roll < 0.40) { // 20% Geode (total 40% good tier)
+                foundGeode = true;
+                mysteryGeodesCount++;
+                outcomeMessage = `Great Scott! ${currentDonkeyName}'s keen eyes spotted a Mystery Geode!`;
+            } else { // 60% Common LHB
+                foundLHB = Math.floor(Math.random() * 11) + 5; // 5-15 LHB
+                luckyHayBales += foundLHB;
+                outcomeMessage = `${currentDonkeyName} munched on some grass and found ${foundLHB} Lucky Hay Bales!`;
+            }
+            showTemporaryMessage(exploreMessageP, outcomeMessage, 3500);
+        }
+        updateAllDisplays();
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
     });
 
     crackGeodeButton.addEventListener('click', () => {
@@ -380,15 +383,6 @@ function initializeAppLogic() {
     // --- Tab Navigation Logic ---
     function showTab(tabIdToShow) {
         console.log("[Tabs] Attempting to show tab:", tabIdToShow);
-        
-        // Add special handling for map tab
-        if (tabIdToShow === 'map-tab-content') {
-            console.log("[Map] Map tab selected, forcing map render");
-            setTimeout(() => {
-                renderMap(); // Re-render the map when the tab is shown
-            }, 100); // Small delay to ensure the tab is visible first
-        }
-        
         tabPanels.forEach(panel => {
             if (panel) {
                 panel.classList.add('hidden');
@@ -396,7 +390,6 @@ function initializeAppLogic() {
                 console.error("[Tabs] A tab panel element is null.");
             }
         });
-        
         const panelToShow = document.getElementById(tabIdToShow);
         if (panelToShow) {
             panelToShow.classList.remove('hidden');
@@ -541,7 +534,7 @@ function initializeAppLogic() {
         console.error("[IntroDebugCRITICAL] confirmDonkeyNameButton not found!");
     }
 
-    function initializeView() {
+    function initializeView() { // Was checkIntroStatus
         console.log("[ViewInit] Initializing view state.");
         const hasDoneIntro = localStorage.getItem(LOCAL_STORAGE_INTRO_KEY) === 'true';
         const savedName = localStorage.getItem(LOCAL_STORAGE_DONKEY_NAME_KEY);
@@ -570,12 +563,6 @@ function initializeAppLogic() {
         }
         // All UI showing/hiding is now handled by updateUIVisibility
         updateUIVisibility();
-
-        // Now load all game state here before initializing map/view
-        loadGameState(); // Load LHB, items, AND map data
-        
-        // Initialize map using potentially loaded data
-        initializeMap(); 
     }
 
     disconnectButton.addEventListener('click', async () => {
@@ -586,475 +573,8 @@ function initializeAppLogic() {
         }
     });
 
-    initializeView(); // Sets up intro/connect/game visibility and loads game state/map
-    initializeMap(); // Ensure map is initialized
-    renderMap();     // Render the map based on initial/loaded state after view is initialized
-    updateAllDisplays(); // Update all text displays based on loaded state
-    showTab('actions-tab-content'); // Set default tab after everything is loaded and rendered
-    
-    // Add a debug button to the UI for direct map access
-    const debugContainer = document.createElement('div');
-    debugContainer.style.position = 'fixed';
-    debugContainer.style.bottom = '10px';
-    debugContainer.style.right = '10px';
-    debugContainer.style.zIndex = '9999';
-    
-    const debugButton = document.createElement('button');
-    debugButton.textContent = 'Debug Map';
-    debugButton.style.padding = '5px';
-    debugButton.style.fontSize = '12px';
-    debugButton.style.backgroundColor = '#ff6b6b';
-    debugButton.addEventListener('click', () => {
-        console.log("[Debug] Forcing map rendering...");
-        console.log("[Debug] Current map data:", mapData);
-        console.log("[Debug] Map container:", document.getElementById('map-grid-container'));
-        
-        showTab('map-tab-content');
-        setTimeout(() => {
-            initializeMap(); // Force reinitialize
-            renderMap(); // Force render
-        }, 100);
-    });
-    
-    debugContainer.appendChild(debugButton);
-    document.body.appendChild(debugContainer);
+    initializeView(); // This will show intro or connect area via updateUIVisibility
+    showTab('actions-tab-content'); // Show the Actions tab by default when the game loads (if not in intro)
+    updateAllDisplays(); // Initial UI setup for default values
 }
-
-// Make map functions accessible outside initializeAppLogic if needed, 
-// otherwise define them inside or pass necessary variables.
-// For simplicity, define them outside for now, assuming mapData and constants are accessible.
-
-// Need to declare mapData outside initializeAppLogic or pass it around.
-// Let's keep mapData declared inside initializeAppLogic for now and pass it where needed,
-// or make map functions inner functions of initializeAppLogic.
-
-// Decision: Make map functions inner functions of initializeAppLogic for easier access to state and UI elements.
-
-function initializeUI() {
-    // Assign elements to the declared variables
-    connectWalletButton = document.getElementById('ton-connect-button-root');
-    walletInfoDiv = document.getElementById('wallet-info');
-    disconnectButton = document.getElementById('disconnect-button');
-    gameContainerDiv = document.getElementById('game-container');
-    actionsTabContent = document.getElementById('actions-tab-content');
-    shopTabContent = document.getElementById('shop-tab-content');
-    inventoryTabContent = document.getElementById('inventory-tab-content');
-    mapTabContent = document.getElementById('map-tab-content');
-    mapGridContainer = document.getElementById('map-grid-container');
-    mapMessage = document.getElementById('map-message');
-
-    spendInput = document.getElementById('spend-amount');
-    spendButton = document.getElementById('spend-button');
-    spendMessage = document.getElementById('spend-message');
-    exploreButton = document.getElementById('explore-button');
-    exploreMessage = document.getElementById('explore-message');
-
-    tonkeyBalanceSpan = document.getElementById('tonkey-balance');
-    lhbBalanceSpan = document.getElementById('lhb-balance');
-    carrotCountSpan = document.getElementById('carrot-count');
-    stickCountSpan = document.getElementById('stick-count');
-    premiumMapStatusSpan = document.getElementById('premium-map-status');
-
-    buyPremiumMapButton = document.getElementById('buy-premium-map-button');
-    shopMessage = document.getElementById('shop-message');
-    inventoryMessage = document.getElementById('inventory-message');
-
-    // Tab related elements
-    tabButtons = document.querySelectorAll('.tab-button');
-    tabPanels = document.querySelectorAll('.tab-panel');
-
-    // Event Listeners
-    if (disconnectButton) {
-        disconnectButton.addEventListener('click', disconnectWallet);
-    } else {
-        console.error("Disconnect button not found during initialization.");
-    }
-    if (spendButton) {
-        spendButton.addEventListener('click', initiateSpendTransaction);
-    } else {
-        console.error("Spend button not found during initialization.");
-    }
-    if (exploreButton) {
-        exploreButton.addEventListener('click', explore);
-    } else {
-        console.error("Explore button not found during initialization.");
-    }
-    if (buyPremiumMapButton) {
-        buyPremiumMapButton.addEventListener('click', buyPremiumMap);
-    } else {
-        console.error("Buy Premium Map button not found during initialization.");
-    }
-
-    setupTabs();
-
-    // Show default tab (actions)
-    showTab('actions-tab-content');
-}
-
-function setupTabs() {
-    // ... existing code ...
-}
-
-// --- Game Actions ---
-
-function explore() {
-    console.log("[Explore] Explore function called");
-    if (luckyHayBales < EXPLORE_COST_LHB) {
-        exploreMessageP.textContent = `${currentDonkeyName} needs more LHB for an adventure!`;
-        exploreMessageP.className = 'message-area error';
-        return;
-    }
-
-    // Deduct cost
-    luckyHayBales -= EXPLORE_COST_LHB;
-    
-    // --- Map Exploration Logic ---
-    let potentialCells = [];
-    
-    // First, check if map data is properly initialized
-    if (!mapData || !Array.isArray(mapData) || mapData.length !== MAP_ROWS) {
-        console.error("[Explore] Map data not properly initialized!");
-        initializeMap(); // Re-initialize the map
-    }
-    
-    // Find unexplored cells adjacent to current position or any discovered cell
-    if (currentMapPosition.row !== -1 && currentMapPosition.col !== -1) {
-        // Check cells adjacent to current position first
-        const directions = [
-            [-1, 0], [1, 0], [0, -1], [0, 1], // Cardinal directions
-            [-1, -1], [-1, 1], [1, -1], [1, 1] // Diagonals
-        ];
-        
-        for (const [dr, dc] of directions) {
-            const newRow = currentMapPosition.row + dr;
-            const newCol = currentMapPosition.col + dc;
-            
-            if (newRow >= 0 && newRow < MAP_ROWS && newCol >= 0 && newCol < MAP_COLS && 
-                mapData[newRow][newCol] && !mapData[newRow][newCol].discovered) {
-                potentialCells.push({ row: newRow, col: newCol, distance: 1 });
-            }
-        }
-    }
-    
-    // If no adjacent cells to current position, find cells adjacent to any discovered cell
-    if (potentialCells.length === 0) {
-        for (let r = 0; r < MAP_ROWS; r++) {
-            for (let c = 0; c < MAP_COLS; c++) {
-                if (mapData[r][c] && mapData[r][c].discovered) {
-                    // Check adjacent cells (only cardinal directions)
-                    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-                    for (const [dr, dc] of directions) {
-                        const newRow = r + dr;
-                        const newCol = c + dc;
-                        
-                        if (newRow >= 0 && newRow < MAP_ROWS && newCol >= 0 && newCol < MAP_COLS && 
-                            mapData[newRow][newCol] && !mapData[newRow][newCol].discovered) {
-                            // Add if not already in the list
-                            if (!potentialCells.some(cell => cell.row === newRow && cell.col === newCol)) {
-                                potentialCells.push({ row: newRow, col: newCol, distance: 2 });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // If still no cells, find any undiscovered cell
-    if (potentialCells.length === 0) {
-        for (let r = 0; r < MAP_ROWS; r++) {
-            for (let c = 0; c < MAP_COLS; c++) {
-                if (mapData[r][c] && !mapData[r][c].discovered) {
-                    potentialCells.push({ row: r, col: c, distance: 999 });
-                    // We just need to find one undiscovered cell to continue
-                    break;
-                }
-            }
-            if (potentialCells.length > 0) break;
-        }
-    }
-    
-    // Reveal a cell if we found potential cells
-    let mapUpdateMsg = "";
-    
-    if (potentialCells.length > 0) {
-        // Choose which cell to reveal based on Premium Map status
-        let cellToReveal;
-        
-        if (hasPremiumMap) {
-            // With Premium Map: Prefer special locations or closer cells
-            potentialCells.sort((a, b) => {
-                // First sort by whether it's a special location
-                const aSpecial = mapData[a.row][a.col].special ? 1 : 0;
-                const bSpecial = mapData[b.row][b.col].special ? 1 : 0;
-                
-                if (bSpecial !== aSpecial) return bSpecial - aSpecial;
-                
-                // Then by distance (closer is better)
-                return a.distance - b.distance;
-            });
-            
-            cellToReveal = potentialCells[0]; // Take best cell
-            hasPremiumMap = false; // Consume the premium map
-            
-            mapUpdateMsg = `Using the Premium Map, ${currentDonkeyName} found a promising area!`;
-        } else {
-            // Regular exploration - random cell
-            const randomIndex = Math.floor(Math.random() * Math.min(potentialCells.length, 3));
-            cellToReveal = potentialCells[randomIndex];
-            mapUpdateMsg = `${currentDonkeyName} explored and discovered a new area!`;
-        }
-        
-        // Update the cell to be discovered
-        mapData[cellToReveal.row][cellToReveal.col].discovered = true;
-        
-        // Update current position
-        mapData[currentMapPosition.row][currentMapPosition.col].isCurrent = false;
-        currentMapPosition = { row: cellToReveal.row, col: cellToReveal.col };
-        mapData[cellToReveal.row][cellToReveal.col].isCurrent = true;
-        
-        // Get terrain details for the message
-        const terrainType = mapData[cellToReveal.row][cellToReveal.col].terrain;
-        const isSpecial = mapData[cellToReveal.row][cellToReveal.col].special;
-        
-        let terrainMsg = "";
-        switch(terrainType) {
-            case 'grass': terrainMsg = "grassy plains"; break;
-            case 'hills': terrainMsg = "rolling hills"; break;
-            case 'mountains': terrainMsg = "steep mountains"; break;
-            case 'water': terrainMsg = "sparkling waters"; break;
-            case 'forest': terrainMsg = "dense forest"; break;
-            case 'desert': terrainMsg = "arid desert"; break;
-            default: terrainMsg = "interesting terrain";
-        }
-        
-        // Update the map message
-        if (mapMessage) {
-            mapMessage.textContent = `${mapUpdateMsg} You found ${isSpecial ? "a special area with " : ""}${terrainMsg}!`;
-            mapMessage.className = 'message-area success';
-        }
-        
-        // Re-render the map
-        renderMap();
-        
-        // Terrain-specific bonuses for rewards
-        let terrainBonus = 0;
-        switch(terrainType) {
-            case 'mountains': terrainBonus = 0.1; break; // Better for geodes
-            case 'forest': terrainBonus = 0.05; break;   // Better for LHB
-            case 'desert': terrainBonus = 0.1; break;    // Better for ancient coins
-            case 'water': terrainBonus = 0.05; break;    // Better for pebbles
-        }
-        
-        // Special location bonus
-        if (isSpecial) terrainBonus += 0.15;
-        
-        // Standard rewards with terrain bonuses
-        let outcomeMessage = "";
-        const roll = Math.random();
-        
-        if (roll < 0.01) {
-            // Very rare: almost nothing
-            const foundLHB = Math.floor(Math.random() * 2) + 1;
-            luckyHayBales += foundLHB;
-            outcomeMessage = `${currentDonkeyName} got distracted but still found ${foundLHB} LHB.`;
-        } else if (roll < (0.05 + terrainBonus)) {
-            // Rare: Ancient Coin
-            ancientCoinsCount++;
-            outcomeMessage = `Incredible! ${currentDonkeyName} sniffed out a rare Ancient Coin!`;
-        } else if (roll < (0.20 + terrainBonus)) {
-            // Uncommon: Shiny Pebbles
-            const foundPebbles = Math.floor(Math.random() * 3) + 1;
-            shinyPebblesCount += foundPebbles;
-            outcomeMessage = `${currentDonkeyName} found ${foundPebbles} Shiny Pebble${foundPebbles > 1 ? 's' : ''}!`;
-        } else if (roll < (0.40 + terrainBonus)) {
-            // Common: Geode
-            mysteryGeodesCount++;
-            outcomeMessage = `Great Scott! ${currentDonkeyName} spotted a Mystery Geode!`;
-        } else {
-            // Very common: LHB
-            const foundLHB = Math.floor(Math.random() * 11) + 5;
-            luckyHayBales += foundLHB;
-            outcomeMessage = `${currentDonkeyName} munched on grass and found ${foundLHB} LHB!`;
-        }
-        
-        // Display reward message
-        exploreMessageP.textContent = outcomeMessage;
-        exploreMessageP.className = 'message-area success';
-    } else {
-        // No more cells to explore
-        mapUpdateMsg = "The entire map has been explored!";
-        if (mapMessage) {
-            mapMessage.textContent = mapUpdateMsg;
-            mapMessage.className = 'message-area info';
-        }
-        
-        // Still give some LHB as consolation
-        const foundLHB = Math.floor(Math.random() * 5) + 3;
-        luckyHayBales += foundLHB;
-        exploreMessageP.textContent = `The map is fully explored, but ${currentDonkeyName} still found ${foundLHB} LHB!`;
-        exploreMessageP.className = 'message-area info';
-    }
-    
-    // Update displays and save state
-    updateAllDisplays();
-    saveGameState();
-    
-    // Haptic feedback
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-}
-
-function buyPremiumMap() {
-    if (!currentWalletInfo) {
-        shopMessage.textContent = "Connect your wallet first!";
-        shopMessage.className = 'message-area error';
-        return;
-    }
-    if (hasPremiumMap) {
-        shopMessage.textContent = "You already own the Premium Map.";
-        shopMessage.className = 'message-area info';
-        return;
-    }
-    if (lhbBalance < PREMIUM_MAP_COST) {
-        shopMessage.textContent = `Not enough LHB. You need ${PREMIUM_MAP_COST}.`;
-        shopMessage.className = 'message-area error';
-        return;
-    }
-
-    lhbBalance -= PREMIUM_MAP_COST;
-    hasPremiumMap = true;
-    // premiumMapStatusSpan, buyPremiumMapButton, shopMessage will be updated in updateAllDisplays
-    shopMessage.textContent = "Successfully bought the Premium Map! It might reveal more when exploring.";
-    shopMessage.className = 'message-area success';
-    updateAllDisplays();
-    saveGameState();
-}
-
-// --- Blockchain Interaction (TonConnect & ton.js) ---
-// ... existing code ...
-
-// --- UI Update Functions ---
-
-function updateWalletInfo(walletInfo) {
-// ... existing code ...
-}
-
-function updateUIForConnectionState(isConnected) {
-// ... existing code ...
-}
-
-function updateAllDisplays() {
-    // Ensure elements are available before trying to update them
-    if (!tonkeyBalanceSpan || !lhbBalanceSpan || !carrotCountSpan || !stickCountSpan || 
-        !premiumMapStatusSpan || !buyPremiumMapButton || !spendInput || !spendButton || !exploreButton) {
-        // console.warn("UI elements not ready for updateAllDisplays. DOM might not be fully initialized.");
-        return;
-    }
-
-    tonkeyBalanceSpan.textContent = currentTonkeyBalance !== null ? `${currentTonkeyBalance} TKY` : 'Loading...';
-    lhbBalanceSpan.textContent = lhbBalance;
-    carrotCountSpan.textContent = carrotCount;
-    stickCountSpan.textContent = stickCount;
-
-    premiumMapStatusSpan.textContent = hasPremiumMap ? 'Acquired' : 'Not Owned';
-    premiumMapStatusSpan.style.color = hasPremiumMap ? 'green' : 'grey';
-    buyPremiumMapButton.disabled = hasPremiumMap || luckyHayBales < PREMIUM_MAP_COST;
-
-    // Input States
-    const interactable = !!userWalletAddress; // Can interact if wallet is connected
-    spendInput.disabled = !interactable;
-    spendButton.disabled = !interactable;
-    exploreButton.disabled = !interactable;
-
-    // Render map (Only if needed, usually handled by explore action)
-    // renderMap();
-}
-
-function loadGameState() {
-    console.log("[GameState] Loading game state...");
-    // Load basic game state
-    luckyHayBales = parseInt(localStorage.getItem('lhbBalance') || '50');
-    mysteryGeodesCount = parseInt(localStorage.getItem('mysteryGeodesCount') || '0');
-    shinyPebblesCount = parseInt(localStorage.getItem('shinyPebblesCount') || '0');
-    ancientCoinsCount = parseInt(localStorage.getItem('ancientCoinsCount') || '0');
-    hasPremiumMap = localStorage.getItem('hasPremiumMap') === 'true';
-    blueprintFragmentsCount = parseInt(localStorage.getItem('blueprintFragmentsCount') || '0');
-    
-    // Load map data with proper format
-    const savedMapDataString = localStorage.getItem('mapData');
-    if (savedMapDataString) {
-        try {
-            mapData = JSON.parse(savedMapDataString);
-            
-            // Handle legacy map data format (convert if needed)
-            if (Array.isArray(mapData) && mapData.length > 0 && typeof mapData[0][0] === 'number') {
-                console.log("[GameState] Converting legacy map format");
-                const newMapData = [];
-                for (let r = 0; r < mapData.length; r++) {
-                    newMapData[r] = [];
-                    for (let c = 0; c < mapData[r].length; c++) {
-                        const terrainType = TERRAIN_TYPES[Math.floor(Math.random() * TERRAIN_TYPES.length)];
-                        const isSpecial = Math.random() < SPECIAL_LOCATION_CHANCE;
-                        newMapData[r][c] = {
-                            discovered: mapData[r][c] === 1,
-                            terrain: terrainType,
-                            special: isSpecial && mapData[r][c] === 1 // Only mark as special if discovered
-                        };
-                    }
-                }
-                mapData = newMapData;
-            }
-            
-            // Validate structure and dimensions
-            if (Array.isArray(mapData) && mapData.length === MAP_ROWS &&
-                mapData.every(row => Array.isArray(row) && row.length === MAP_COLS)) {
-                console.log("[GameState] Map data loaded successfully");
-                
-                // Load current position
-                const savedPosition = localStorage.getItem('currentMapPosition');
-                if (savedPosition) {
-                    try {
-                        currentMapPosition = JSON.parse(savedPosition);
-                    } catch (e) {
-                        console.error("[GameState] Failed to parse current position", e);
-                        // Will be recalculated in initializeMap
-                    }
-                }
-            } else {
-                console.warn("[GameState] Saved map has incorrect dimensions/structure. Re-initializing map.");
-                mapData = []; // Will trigger re-initialization in initializeMap
-            }
-        } catch (e) {
-            console.error("[GameState] Failed to parse map data", e);
-            mapData = []; // Will trigger re-initialization in initializeMap
-        }
-    } else {
-        console.log("[GameState] No saved map data found. Will initialize new map.");
-        mapData = []; // Will trigger re-initialization in initializeMap
-    }
-}
-
-function saveGameState() {
-    console.log("[GameState] Saving game state...");
-    // Save basic game state
-    localStorage.setItem('lhbBalance', luckyHayBales.toString());
-    localStorage.setItem('mysteryGeodesCount', mysteryGeodesCount.toString());
-    localStorage.setItem('shinyPebblesCount', shinyPebblesCount.toString());
-    localStorage.setItem('ancientCoinsCount', ancientCoinsCount.toString());
-    localStorage.setItem('hasPremiumMap', hasPremiumMap.toString());
-    localStorage.setItem('blueprintFragmentsCount', blueprintFragmentsCount.toString());
-    
-    // Save map data
-    if (mapData && mapData.length === MAP_ROWS) {
-        localStorage.setItem('mapData', JSON.stringify(mapData));
-        localStorage.setItem('currentMapPosition', JSON.stringify(currentMapPosition));
-        console.log("[GameState] Map data saved");
-    } else {
-        console.warn("[GameState] Attempted to save invalid map data. Skipping map save.");
-    }
-}
-
-// --- Utility Functions ---
-// ... existing code ...
 // --------------- APP LOGIC ENDS HERE ----------------- 
-// Removed duplicate function definitions previously outside initializeAppLogic
